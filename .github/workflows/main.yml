@@ -29,7 +29,7 @@ jobs:
     - name: Test query
       run: python3 query.py
       env:
-        ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
 
     # TODO: Generate the images
 
