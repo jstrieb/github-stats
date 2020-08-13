@@ -166,12 +166,39 @@ def query(generated_query: str) -> Dict:
     return r.json()
 
 
+def get_stats() -> Dict:
+    """
+    Print summary statistics about forks, stars, and languages
+    """
+    stargazers = 0
+    forks = 0
+    langs = dict()
+
+    owned_repo_data = query(owned_overview_query()).get("data", {})
+    repos = owned_repo_data.get("viewer", {}).get("repositories", {})
+    for repo in repos.get("nodes", []):
+        stargazers += repo.get("stargazers").get("totalCount", 0)
+        forks += repo.get("forkCount", 0)
+        for lang in repo.get("languages", {}).get("edges", []):
+            name = lang.get("node", {}).get("name", "Other")
+            langs[name] = langs.get(name, 0) + lang.get("size", 0)
+
+    langs_total = sum(langs.values())
+    langs_proportional = {l: 100 * (s / langs_total) for l, s in langs.items()}
+
+    return {
+        "stargazers": stargazers,
+        "forks": forks,
+        "languages": langs_proportional,
+    }
+
+
 ###############################################################################
 # Main Function
 ###############################################################################
 
 def main() -> None:
-    print(json.dumps(query(owned_overview_query()), indent=2))
+    print(json.dumps(get_stats(), indent=2))
 
 
 if __name__ == "__main__":
