@@ -20,6 +20,15 @@ jobs:
     # Checks-out repository under $GITHUB_WORKSPACE, so the job can access it
     - uses: actions/checkout@v2
 
+    # Cache dependencies. From:
+    # https://github.com/actions/cache/blob/master/examples.md#python---pip
+    - uses: actions/cache@v2
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
     # Install dependencies with `pip`
     - name: Install requirements
       run: python3 -m pip install -r requirements.txt
