@@ -2,8 +2,9 @@
 
 import json
 import os
+from builtins import bytes
 
-from typing import Dict
+from typing import Dict, List
 
 import requests
 
@@ -146,6 +147,39 @@ query StargazersOwned {{
 """
 
 
+def contrib_years() -> str:
+    return """
+query {
+  viewer {
+    contributionsCollection {
+      contributionYears
+    }
+  }
+}
+"""
+
+
+def contribs_by_year(year: str) -> str:
+    return f"""
+    year{year}: contributionsCollection(from: "{year}-01-01T00:00:00Z", to: "{year + 1}-01-01T00:00:00Z") {{
+      contributionCalendar {{
+        totalContributions
+      }}
+    }}
+"""
+
+
+def all_contribs(years: List[str]) -> str:
+    by_years = "\n".join(map(contribs_by_year, years))
+    return f"""
+query {{
+  viewer {{
+    {by_years}
+  }}
+}}
+"""
+
+
 ###############################################################################
 # Helper Functions
 ###############################################################################
@@ -174,8 +208,10 @@ def get_stats() -> Dict:
     forks = 0
     langs = dict()
 
-    owned_repo_data = query(owned_overview_query()).get("data", {})
-    repos = owned_repo_data.get("viewer", {}).get("repositories", {})
+    repos = query(owned_overview_query())\
+        .get("data", {})\
+        .get("viewer", {})\
+        .get("repositories", {})
     for repo in repos.get("nodes", []):
         stargazers += repo.get("stargazers").get("totalCount", 0)
         forks += repo.get("forkCount", 0)
@@ -183,12 +219,29 @@ def get_stats() -> Dict:
             name = lang.get("node", {}).get("name", "Other")
             langs[name] = langs.get(name, 0) + lang.get("size", 0)
 
+    # TODO: Improve languages to scale by number of contributions to specific
+    #       filetypes
     langs_total = sum(langs.values())
     langs_proportional = {l: 100 * (s / langs_total) for l, s in langs.items()}
+
+    total_contribs = 0
+    years = query(contrib_years())\
+        .get("data", {})\
+        .get("viewer", {})\
+        .get("contributionsCollection", {})\
+        .get("contributionYears", [])
+    by_year = query(all_contribs(years))\
+        .get("data", {})\
+        .get("viewer", {}).values()
+    for year in by_year:
+        total_contribs += year\
+            .get("contributionCalendar", {})\
+            .get("totalContributions", 0)
 
     return {
         "stargazers": stargazers,
         "forks": forks,
+        "total_contributions": total_contribs,
         "languages": langs_proportional,
     }
 
