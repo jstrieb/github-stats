@@ -13,36 +13,40 @@ import requests
 # GitHub API GraphQL Query Generators
 ###############################################################################
 
-def owned_overview_query() -> str:
+def owned_overview_query(after: str = "") -> str:
     """
     :return: GitHub GraphQL API query with the star count, fork count, and languages used for the repositories owned by the user
     """
-    return """
-query RepositoryStatsOwned {
-  viewer {
-    repositories(ownerAffiliations: OWNER, first: 100, orderBy: {field: STARGAZERS, direction: DESC}, isFork: false) {
-      nodes {
+    return f"""
+query RepositoryStatsOwned {{
+  viewer {{
+    repositories(ownerAffiliations: OWNER, first: 100, orderBy: {{field: STARGAZERS, direction: DESC}}, isFork: false{f', after: "{after}"' if after else ""}) {{
+      nodes {{
         nameWithOwner
-        stargazers {
+        stargazers {{
           totalCount
-        }
+        }}
         forkCount
-        languages(first: 10) {
-          nodes {
+        languages(first: 10) {{
+          nodes {{
             id
-          }
-          edges {
+          }}
+          edges {{
             size
-            node {
+            node {{
               name
               color
-            }
-          }
-        }
-      }
-    }
-  }
-}"""
+            }}
+          }}
+        }}
+      }}
+      pageInfo {{
+        hasNextPage
+        endCursor
+      }}
+    }}
+  }}
+}}"""
 
 
 def contrib_overview_query() -> str:
@@ -148,6 +152,10 @@ query StargazersOwned {{
 
 
 def contrib_years() -> str:
+    """
+    TODO
+    :return:
+    """
     return """
 query {
   viewer {
@@ -160,6 +168,11 @@ query {
 
 
 def contribs_by_year(year: str) -> str:
+    """
+    TODO
+    :param year:
+    :return:
+    """
     return f"""
     year{year}: contributionsCollection(from: "{year}-01-01T00:00:00Z", to: "{year + 1}-01-01T00:00:00Z") {{
       contributionCalendar {{
@@ -170,6 +183,11 @@ def contribs_by_year(year: str) -> str:
 
 
 def all_contribs(years: List[str]) -> str:
+    """
+    TODO
+    :param years:
+    :return:
+    """
     by_years = "\n".join(map(contribs_by_year, years))
     return f"""
 query {{
@@ -207,17 +225,28 @@ def get_stats() -> Dict:
     stargazers = 0
     forks = 0
     langs = dict()
+    repo_names = set()
 
-    repos = query(owned_overview_query())\
-        .get("data", {})\
-        .get("viewer", {})\
-        .get("repositories", {})
-    for repo in repos.get("nodes", []):
-        stargazers += repo.get("stargazers").get("totalCount", 0)
-        forks += repo.get("forkCount", 0)
-        for lang in repo.get("languages", {}).get("edges", []):
-            name = lang.get("node", {}).get("name", "Other")
-            langs[name] = langs.get(name, 0) + lang.get("size", 0)
+    # TODO: Move to separate function
+    after = ""
+    while True:
+        repos = query(owned_overview_query(after)) \
+            .get("data", {}) \
+            .get("viewer", {}) \
+            .get("repositories", {})
+
+        for repo in repos.get("nodes", []):
+            repo_names.add(repo.get("nameWithOwner"))
+            stargazers += repo.get("stargazers").get("totalCount", 0)
+            forks += repo.get("forkCount", 0)
+            for lang in repo.get("languages", {}).get("edges", []):
+                name = lang.get("node", {}).get("name", "Other")
+                langs[name] = langs.get(name, 0) + lang.get("size", 0)
+
+        if repos.get("pageInfo", {}).get("hasNextPage", False):
+            after = repos.get("pageInfo", {}).get("endCursor")
+        else:
+            break
 
     # TODO: Improve languages to scale by number of contributions to specific
     #       filetypes
@@ -242,6 +271,7 @@ def get_stats() -> Dict:
         "stargazers": stargazers,
         "forks": forks,
         "total_contributions": total_contribs,
+        "owned_repos": len(repo_names),
         "languages": langs_proportional,
     }
 
