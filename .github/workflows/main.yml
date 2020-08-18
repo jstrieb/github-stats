@@ -36,7 +36,7 @@ jobs:
     # TODO: Remove
     # Test querying the repo
     - name: Test query
-      run: python3 query.py
+      run: python3 github_stats.py
       env:
         ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
 
