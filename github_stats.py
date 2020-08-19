@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import json
+import hashlib
 import os
 import time
 
@@ -341,11 +342,12 @@ Languages:
             views = dict()
 
         for repo in self.repos:
-            if repo not in views:
-                views[repo] = dict()
+            key = hashlib.md5(repo.encode("utf-8")).hexdigest()
+            if key not in views:
+                views[key] = dict()
             r = self.queries.query_rest(f"/repos/{repo}/traffic/views")
             for view in r.get("views", []):
-                views[repo][view.get("timestamp")] = view
+                views[key][view.get("timestamp")] = view
             time.sleep(0.5)
 
         with open("data/views_log.json", "w") as f:
