@@ -350,6 +350,8 @@ Languages:
                 views[key][view.get("timestamp")] = view
             time.sleep(0.5)
 
+        if not os.path.isdir("data"):
+            os.mkdir("data")
         with open("data/views_log.json", "w") as f:
             json.dump(views, f, indent=2)
 
