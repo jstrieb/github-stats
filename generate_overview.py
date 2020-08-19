@@ -17,6 +17,7 @@ def main():
     with open("templates/overview.svg", "r") as f:
         output = f.read()
 
+    output = re.sub(r"{{ name }}", s.name, output)
     output = re.sub(r"{{ stars }}", f"{s.stargazers:,}", output)
     output = re.sub(r"{{ forks }}", f"{s.forks:,}", output)
     output = re.sub(r"{{ contributions }}", f"{s.total_contributions:,}", output)

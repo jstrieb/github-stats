@@ -57,6 +57,7 @@ class Queries(object):
                        owned_cursor: Optional[str] = None) -> str:
         return f"""{{
   viewer {{
+    name
     repositories(
         first: 100,
         orderBy: {{
@@ -170,6 +171,7 @@ class Stats(object):
         self._exclude_repos = set() if exclude_repos is None else exclude_repos
         self.queries = Queries(username, access_token)
 
+        self._name = None
         self._stargazers = None
         self._forks = None
         self._total_contributions = None
@@ -182,7 +184,8 @@ class Stats(object):
         formatted_languages = "\n  - ".join(
             [f"{k}: {v:0.4f}%" for k, v in self.languages.items()]
         )
-        return f"""Stargazers: {self.stargazers:,}
+        return f"""Name: {self.name}
+Stargazers: {self.stargazers:,}
 Forks: {self.forks:,}
 All-time contributions: {self.total_contributions:,}
 Repositories with contributions: {len(self.repos)}
@@ -206,6 +209,12 @@ Languages:
                 Queries.repos_overview(owned_cursor=next_owned,
                                        contrib_cursor=next_contrib)
             )
+
+            self._name = (raw_results
+                          .get("data", {})
+                          .get("viewer", {})
+                          .get("name", "No Name"))
+
             contrib_repos = (raw_results
                              .get("data", {})
                              .get("viewer", {})
@@ -249,6 +258,14 @@ Languages:
                                 .get("endCursor", next_contrib))
             else:
                 break
+
+    @property
+    def name(self) -> str:
+        if self._name is not None:
+            return self._name
+        self.get_stats()
+        assert(self._name is not None)
+        return self._name
 
     @property
     def stargazers(self) -> int:

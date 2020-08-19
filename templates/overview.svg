@@ -65,7 +65,7 @@ td {
 
 <table>
 <thead><tr>
-<th colspan="2">Jacob Strieb's GitHub Statistics</th>
+<th colspan="2">{{ name }}'s GitHub Statistics</th>
 </tr></thead>
 <tbody>
 
