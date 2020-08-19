@@ -34,17 +34,22 @@ class Queries(object):
         return r.json()
 
     def query_rest(self, path: str, params: Optional[Dict] = None) -> Dict:
-        headers = {
-            "Authorization": f"token {self.access_token}",
-        }
-        auth = (self.username, self.access_token)
-        if params is None:
-            params = dict()
-        if path.startswith("/"):
-            path = path[1:]
-        r = self.session.get(f"https://api.github.com/{path}", headers=headers,
-                             params=tuple(params.items()))
-        return r.json()
+        while True:
+            headers = {
+                "Authorization": f"token {self.access_token}",
+            }
+            auth = (self.username, self.access_token)
+            if params is None:
+                params = dict()
+            if path.startswith("/"):
+                path = path[1:]
+            r = self.session.get(f"https://api.github.com/{path}", headers=headers,
+                                 params=tuple(params.items()))
+            if r.status_code == 202:
+                print(f"{path} returned 202. Retrying...")
+                time.sleep(1)
+                continue
+            return r.json()
 
     @staticmethod
     def repos_overview(contrib_cursor: Optional[str] = None,
@@ -170,6 +175,7 @@ class Stats(object):
         self._languages = None
         self._repos = None
         self._lines_changed = None
+        self._views = None
 
     def __str__(self) -> str:
         formatted_languages = "\n  - ".join(
@@ -182,6 +188,7 @@ Repositories with contributions: {len(self.repos)}
 Lines of code added: {self.lines_changed[0]:,}
 Lines of code deleted: {self.lines_changed[1]:,}
 Lines of code changed: {self.lines_changed[0] + self.lines_changed[1]:,}
+Project page views: {self.views:,}
 Languages:
   - {formatted_languages}"""
 
@@ -303,7 +310,7 @@ Languages:
         return self._total_contributions
 
     @property
-    def lines_changed(self):
+    def lines_changed(self) -> Tuple[int, int]:
         if self._lines_changed is not None:
             return self._lines_changed
         additions = 0
@@ -322,6 +329,35 @@ Languages:
 
         self._lines_changed = (additions, deletions)
         return self._lines_changed
+
+    @property
+    def views(self) -> int:
+        if self._views is not None:
+            return self._views
+        try:
+            with open("data/views_log.json", "r") as f:
+                views = json.load(f)
+        except FileNotFoundError:
+            views = dict()
+
+        for repo in self.repos:
+            if repo not in views:
+                views[repo] = dict()
+            r = self.queries.query_rest(f"/repos/{repo}/traffic/views")
+            for view in r.get("views", []):
+                views[repo][view.get("timestamp")] = view
+            time.sleep(0.5)
+
+        with open("data/views_log.json", "w") as f:
+            json.dump(views, f, indent=2)
+
+        total = 0
+        for repo in views.values():
+            for day in repo.values():
+                total += day.get("count", 0)
+
+        self._views = total
+        return total
 
 
 ###############################################################################
