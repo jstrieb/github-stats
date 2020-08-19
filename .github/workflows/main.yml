@@ -37,8 +37,8 @@ jobs:
 
     # TODO: Remove
     # Test querying the repo
-    - name: Test query
-      run: python3 generate_overview.py
+    - name: Generate images
+      run: python3 generate_images.py
       env:
         ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
 
