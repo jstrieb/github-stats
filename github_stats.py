@@ -41,7 +41,7 @@ class Queries(object):
             field: UPDATED_AT, 
             direction: DESC
         }}, 
-        after: {"null" if owned_cursor is None else '"' + owned_cursor + '"'}
+        after: {"null" if owned_cursor is None else '"'+owned_cursor+'"'}
     ) {{
       pageInfo {{
         hasNextPage
@@ -77,7 +77,7 @@ class Queries(object):
             REPOSITORY, 
             PULL_REQUEST_REVIEW
         ]
-        after: {"null" if contrib_cursor is None else '"' + contrib_cursor + '"'}
+        after: {"null" if contrib_cursor is None else '"'+contrib_cursor+'"'}
     ) {{
       pageInfo {{
         hasNextPage
@@ -154,7 +154,7 @@ class Stats(object):
 
     def __str__(self) -> str:
         formatted_languages = "\n  - ".join(
-            [f"{l}: {v:0.2f}%" for l, v in self.languages.items()]
+            [f"{k}: {v:0.4f}%" for k, v in self.languages.items()]
         )
         return f"""Stargazers: {self.stargazers:,}
 Forks: {self.forks:,}
@@ -184,10 +184,13 @@ Languages:
                            .get("data", {})
                            .get("viewer", {})
                            .get("repositories", {}))
-            repos = contrib_repos.get("nodes", []) + owned_repos.get("nodes", [])
+            repos = (contrib_repos.get("nodes", [])
+                     + owned_repos.get("nodes", []))
 
             for repo in repos:
                 name = repo.get("nameWithOwner")
+                if name in self._repos:
+                    continue
                 self._repos.add(name)
                 self._stargazers += repo.get("stargazers").get("totalCount", 0)
                 self._forks += repo.get("forkCount", 0)
@@ -206,10 +209,14 @@ Languages:
                             "color": lang.get("color")
                         }
 
-            if (owned_repos.get("pageInfo", {}).get("hasNextPage", False)
-                or contrib_repos.get("pageInfo", {}).get("hasNextPage", False)):
-                next_owned = owned_repos.get("pageInfo", {}).get("endCursor")
-                next_contrib = contrib_repos.get("pageInfo", {}).get("endCursor")
+            if owned_repos.get("pageInfo", {}).get("hasNextPage", False) or \
+                    contrib_repos.get("pageInfo", {}).get("hasNextPage", False):
+                next_owned = (owned_repos
+                              .get("pageInfo", {})
+                              .get("endCursor", next_owned))
+                next_contrib = (contrib_repos
+                                .get("pageInfo", {})
+                                .get("endCursor", next_contrib))
             else:
                 break
 
@@ -218,6 +225,7 @@ Languages:
         if self._stargazers is not None:
             return self._stargazers
         self.get_stats()
+        assert(self._stargazers is not None)
         return self._stargazers
 
     @property
@@ -225,6 +233,7 @@ Languages:
         if self._forks is not None:
             return self._forks
         self.get_stats()
+        assert(self._forks is not None)
         return self._forks
 
     @property
@@ -232,13 +241,14 @@ Languages:
         if self._languages is not None:
             return self._languages
         self.get_stats()
+        assert(self._languages is not None)
 
         # TODO: Improve languages to scale by number of contributions to
         #       specific filetypes
         langs_total = sum([v.get("size", 0) for v in self._languages.values()])
         langs = {
-            l: 100 * (s.get("size", 0) / langs_total)
-            for l, s in self._languages.items()
+            k: 100 * (v.get("size", 0) / langs_total)
+            for k, v in self._languages.items()
         }
         return langs
 
@@ -247,6 +257,7 @@ Languages:
         if self._repos is not None:
             return self._repos
         self.get_stats()
+        assert(self._repos is not None)
         return self._repos
 
     @property
@@ -276,7 +287,7 @@ Languages:
 
 def main() -> None:
     access_token = os.getenv("ACCESS_TOKEN")
-    s = Stats(access_token, exclude_repos={"Genrep-Software/style-guides"})
+    s = Stats(access_token)
     print(s)
 
 
