@@ -1,8 +1,10 @@
 #!/usr/bin/python3
+
 import json
 import os
+import time
 
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 
 import requests
 
@@ -12,7 +14,8 @@ import requests
 ###############################################################################
 
 class Queries(object):
-    def __init__(self, access_token: str):
+    def __init__(self, username: str, access_token: str):
+        self.username = username
         self.access_token = access_token
         self.session = requests.Session()
 
@@ -30,18 +33,31 @@ class Queries(object):
                               json={"query": generated_query})
         return r.json()
 
+    def query_rest(self, path: str, params: Optional[Dict] = None) -> Dict:
+        headers = {
+            "Authorization": f"token {self.access_token}",
+        }
+        auth = (self.username, self.access_token)
+        if params is None:
+            params = dict()
+        if path.startswith("/"):
+            path = path[1:]
+        r = self.session.get(f"https://api.github.com/{path}", headers=headers,
+                             params=tuple(params.items()))
+        return r.json()
+
     @staticmethod
     def repos_overview(contrib_cursor: Optional[str] = None,
                        owned_cursor: Optional[str] = None) -> str:
         return f"""{{
   viewer {{
     repositories(
-        first: 100, 
+        first: 100,
         orderBy: {{
-            field: UPDATED_AT, 
+            field: UPDATED_AT,
             direction: DESC
-        }}, 
-        after: {"null" if owned_cursor is None else '"'+owned_cursor+'"'}
+        }},
+        after: {"null" if owned_cursor is None else '"'+ owned_cursor +'"'}
     ) {{
       pageInfo {{
         hasNextPage
@@ -65,19 +81,19 @@ class Queries(object):
       }}
     }}
     repositoriesContributedTo(
-        first: 100, 
-        includeUserRepositories: false, 
+        first: 100,
+        includeUserRepositories: false,
         orderBy: {{
-            field: UPDATED_AT, 
+            field: UPDATED_AT,
             direction: DESC
-        }}, 
+        }},
         contributionTypes: [
-            COMMIT, 
-            PULL_REQUEST, 
-            REPOSITORY, 
+            COMMIT,
+            PULL_REQUEST,
+            REPOSITORY,
             PULL_REQUEST_REVIEW
         ]
-        after: {"null" if contrib_cursor is None else '"'+contrib_cursor+'"'}
+        after: {"null" if contrib_cursor is None else '"'+ contrib_cursor +'"'}
     ) {{
       pageInfo {{
         hasNextPage
@@ -120,7 +136,7 @@ query {
     def contribs_by_year(year: str) -> str:
         return f"""
     year{year}: contributionsCollection(
-        from: "{year}-01-01T00:00:00Z", 
+        from: "{year}-01-01T00:00:00Z",
         to: "{int(year) + 1}-01-01T00:00:00Z"
     ) {{
       contributionCalendar {{
@@ -142,15 +158,18 @@ query {{
 
 
 class Stats(object):
-    def __init__(self, access_token: str, exclude_repos: Optional[Set] = None):
+    def __init__(self, username: str, access_token: str,
+                 exclude_repos: Optional[Set] = None):
+        self.username = username
         self._exclude_repos = set() if exclude_repos is None else exclude_repos
-        self.queries = Queries(access_token)
+        self.queries = Queries(username, access_token)
 
         self._stargazers = None
         self._forks = None
         self._total_contributions = None
         self._languages = None
         self._repos = None
+        self._lines_changed = None
 
     def __str__(self) -> str:
         formatted_languages = "\n  - ".join(
@@ -160,6 +179,9 @@ class Stats(object):
 Forks: {self.forks:,}
 All-time contributions: {self.total_contributions:,}
 Repositories with contributions: {len(self.repos)}
+Lines of code added: {self.lines_changed[0]:,}
+Lines of code deleted: {self.lines_changed[1]:,}
+Lines of code changed: {self.lines_changed[0] + self.lines_changed[1]:,}
 Languages:
   - {formatted_languages}"""
 
@@ -280,6 +302,27 @@ Languages:
                 .get("totalContributions", 0)
         return self._total_contributions
 
+    @property
+    def lines_changed(self):
+        if self._lines_changed is not None:
+            return self._lines_changed
+        additions = 0
+        deletions = 0
+        for repo in self.repos:
+            r = self.queries.query_rest(f"/repos/{repo}/stats/contributors")
+            for author_obj in r:
+                author = author_obj.get("author", {}).get("login", "")
+                if author != self.username:
+                    continue
+
+                for week in author_obj.get("weeks", []):
+                    additions += week.get("a", 0)
+                    deletions += week.get("d", 0)
+            time.sleep(0.5)
+
+        self._lines_changed = (additions, deletions)
+        return self._lines_changed
+
 
 ###############################################################################
 # Main Function
@@ -287,7 +330,7 @@ Languages:
 
 def main() -> None:
     access_token = os.getenv("ACCESS_TOKEN")
-    s = Stats(access_token)
+    s = Stats("jstrieb", access_token)
     print(s)
 
 
