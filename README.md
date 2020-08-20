@@ -3,11 +3,13 @@
 Generate visualizations of GitHub user and repository statistics using GitHub
 Actions.
 
+This project is currently unfinished.
+
 ## Background
 
 When someone views a profile on GitHub, it is often because they are curious
 about a user's open source projects and contributions. Unfortunately, that
-user's stars, forks, and pinned repositories to not necessarily reflect the
+user's stars, forks, and pinned repositories do not necessarily reflect the
 contributions they make to private repositories. The data likewise does not
 present a complete picture of the user's total contributions beyond the current
 year.
@@ -15,7 +17,13 @@ year.
 This project aims to collect a variety of profile and repository statistics
 using the GitHub API. It then generates images that can be displayed in
 repository READMEs, or in a user's [Profile
-README](https://docs.github.com/en/github/setting-up-and-managing-your-github-profile/managing-your-profile-readme)
+README](https://docs.github.com/en/github/setting-up-and-managing-your-github-profile/managing-your-profile-readme).
+
+Since the project runs on GitHub Actions, no server is required to regularly
+regenerate the images with updated statistics. Likewise, since the user runs
+the analysis code themselves via GitHub Actions, they can use their GitHub
+access token to collect statistics on private repositories that an external
+service would be unable to access.
 
 # Installation
 
@@ -23,15 +31,14 @@ README](https://docs.github.com/en/github/setting-up-and-managing-your-github-pr
 
 <summary> Click here to view installation instructions </summary>
 
-<!-- TODO -->
-TODO
+<!-- TODO: Add details and screenshots -->
+
+1. Create a personal access token (not the default GitHub Actions token)
+  - Personal access token must have permissions: `read:user` and `repo`
+2. Fork the repository
+3. Add a GitHub secret with the personal access token
 
 </details>
-
-## Notes
-
-- Must use a personal access token, not the default GitHub Actions token
-- Personal access token must have permissions: `read:user` and `repo`
 
 # Examples
 
@@ -42,14 +49,6 @@ TODO
 - Languages overview
 
   ![](https://github.com/jstrieb/github-stats/blob/master/generated/languages.svg)
-
-<details>
-
-<summary> Click here to see additional examples </summary>
-
-- More to come later
-
-</details>
 
 # Related Projects
 
