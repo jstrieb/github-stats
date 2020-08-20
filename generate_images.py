@@ -7,13 +7,19 @@ from github_stats import Stats
 
 
 ################################################################################
-# Main Function
+# Helper Functions
 ################################################################################
 
-def main():
-    access_token = os.getenv("ACCESS_TOKEN")
-    s = Stats("jstrieb", access_token)
+def generate_output_folder():
+    if not os.path.isdir("generated"):
+        os.mkdir("generated")
 
+
+################################################################################
+# Individual Image Generation Functions
+################################################################################
+
+def generate_overview(s: Stats) -> None:
     with open("templates/overview.svg", "r") as f:
         output = f.read()
 
@@ -26,10 +32,50 @@ def main():
     output = re.sub(r"{{ views }}", f"{s.views:,}", output)
     output = re.sub(r"{{ repos }}", f"{len(s.repos):,}", output)
 
-    if not os.path.isdir("generated"):
-        os.mkdir("generated")
+    generate_output_folder()
     with open("generated/overview.svg", "w") as f:
         f.write(output)
+
+
+def generate_languages(s: Stats) -> None:
+    with open("templates/languages.svg", "r") as f:
+        output = f.read()
+
+    progress = ""
+    lang_list = ""
+    for lang, data in sorted(s.languages.items(), key=lambda t: t[1].get("size"), reverse=True):
+        color = data.get("color")
+        color = color if color is not None else "#000000"
+        progress += (f'<span style="background-color: {color};' 
+                     f'width: {data.get("prop", 0):0.3f}%;" ' 
+                     f'class="progress-item"></span>')
+        lang_list += f"""
+<li>
+<svg xmlns="http://www.w3.org/2000/svg" class="octicon" style="fill:{color};" viewBox="0 0 16 16" version="1.1" width="16" height="16"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8z"></path></svg>
+<span class="lang">{lang}</span>
+<span class="percent">{data.get("prop", 0):0.2f}%</span>
+</li>
+
+"""
+
+    output = re.sub(r"{{ progress }}", progress, output)
+    output = re.sub(r"{{ lang_list }}", lang_list, output)
+
+    generate_output_folder()
+    with open("generated/languages.svg", "w") as f:
+        f.write(output)
+
+
+################################################################################
+# Main Function
+################################################################################
+
+def main() -> None:
+    access_token = os.getenv("ACCESS_TOKEN")
+    s = Stats("jstrieb", access_token)
+
+    generate_overview(s)
+    generate_languages(s)
 
 
 if __name__ == "__main__":

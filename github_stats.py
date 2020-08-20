@@ -182,7 +182,7 @@ class Stats(object):
 
     def __str__(self) -> str:
         formatted_languages = "\n  - ".join(
-            [f"{k}: {v:0.4f}%" for k, v in self.languages.items()]
+            [f"{k}: {v:0.4f}%" for k, v in self.languages_proportional.items()]
         )
         return f"""Name: {self.name}
 Stargazers: {self.stargazers:,}
@@ -245,7 +245,7 @@ Languages:
                         self.languages[name] = {
                             "size": lang.get("size", 0),
                             "occurrences": 1,
-                            "color": lang.get("color")
+                            "color": lang.get("node", {}).get("color")
                         }
 
             if owned_repos.get("pageInfo", {}).get("hasNextPage", False) or \
@@ -258,6 +258,12 @@ Languages:
                                 .get("endCursor", next_contrib))
             else:
                 break
+
+        # TODO: Improve languages to scale by number of contributions to
+        #       specific filetypes
+        langs_total = sum([v.get("size", 0) for v in self._languages.values()])
+        for k, v in self._languages.items():
+            v["prop"] = 100 * (v.get("size", 0) / langs_total)
 
     @property
     def name(self) -> str:
@@ -289,15 +295,15 @@ Languages:
             return self._languages
         self.get_stats()
         assert(self._languages is not None)
+        return self._languages
 
-        # TODO: Improve languages to scale by number of contributions to
-        #       specific filetypes
-        langs_total = sum([v.get("size", 0) for v in self._languages.values()])
-        langs = {
-            k: 100 * (v.get("size", 0) / langs_total)
-            for k, v in self._languages.items()
-        }
-        return langs
+    @property
+    def languages_proportional(self) -> Dict:
+        if self._languages is None:
+            self.get_stats()
+            assert(self._languages is not None)
+
+        return {k: v.get("prop", 0) for (k, v) in self._languages.items()}
 
     @property
     def repos(self) -> List[str]:
@@ -388,7 +394,8 @@ Languages:
 def main() -> None:
     access_token = os.getenv("ACCESS_TOKEN")
     s = Stats("jstrieb", access_token)
-    print(s)
+    print(json.dumps(s.languages, indent=2))
+    print(json.dumps(s.languages_proportional, indent=2))
 
 
 if __name__ == "__main__":
