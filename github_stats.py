@@ -39,13 +39,12 @@ class Queries(object):
             headers = {
                 "Authorization": f"token {self.access_token}",
             }
-            auth = (self.username, self.access_token)
             if params is None:
                 params = dict()
             if path.startswith("/"):
                 path = path[1:]
-            r = self.session.get(f"https://api.github.com/{path}", headers=headers,
-                                 params=tuple(params.items()))
+            r = self.session.get(f"https://api.github.com/{path}",
+                                 headers=headers, params=tuple(params.items()))
             if r.status_code == 202:
                 print(f"{path} returned 202. Retrying...")
                 time.sleep(1)

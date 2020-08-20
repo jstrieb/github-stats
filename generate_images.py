@@ -23,14 +23,14 @@ def generate_overview(s: Stats) -> None:
     with open("templates/overview.svg", "r") as f:
         output = f.read()
 
-    output = re.sub(r"{{ name }}", s.name, output)
-    output = re.sub(r"{{ stars }}", f"{s.stargazers:,}", output)
-    output = re.sub(r"{{ forks }}", f"{s.forks:,}", output)
-    output = re.sub(r"{{ contributions }}", f"{s.total_contributions:,}", output)
+    output = re.sub("{{ name }}", s.name, output)
+    output = re.sub("{{ stars }}", f"{s.stargazers:,}", output)
+    output = re.sub("{{ forks }}", f"{s.forks:,}", output)
+    output = re.sub("{{ contributions }}", f"{s.total_contributions:,}", output)
     changed = s.lines_changed[0] + s.lines_changed[1]
-    output = re.sub(r"{{ lines_changed }}", f"{changed:,}", output)
-    output = re.sub(r"{{ views }}", f"{s.views:,}", output)
-    output = re.sub(r"{{ repos }}", f"{len(s.repos):,}", output)
+    output = re.sub("{{ lines_changed }}", f"{changed:,}", output)
+    output = re.sub("{{ views }}", f"{s.views:,}", output)
+    output = re.sub("{{ repos }}", f"{len(s.repos):,}", output)
 
     generate_output_folder()
     with open("generated/overview.svg", "w") as f:
@@ -43,7 +43,9 @@ def generate_languages(s: Stats) -> None:
 
     progress = ""
     lang_list = ""
-    for lang, data in sorted(s.languages.items(), key=lambda t: t[1].get("size"), reverse=True):
+    sorted_languages = sorted(s.languages.items(), reverse=True,
+                              key=lambda t: t[1].get("size"))
+    for lang, data in sorted_languages:
         color = data.get("color")
         color = color if color is not None else "#000000"
         progress += (f'<span style="background-color: {color};' 
@@ -51,7 +53,9 @@ def generate_languages(s: Stats) -> None:
                      f'class="progress-item"></span>')
         lang_list += f"""
 <li>
-<svg xmlns="http://www.w3.org/2000/svg" class="octicon" style="fill:{color};" viewBox="0 0 16 16" version="1.1" width="16" height="16"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8z"></path></svg>
+<svg xmlns="http://www.w3.org/2000/svg" class="octicon" style="fill:{color};" 
+viewBox="0 0 16 16" version="1.1" width="16" height="16"><path 
+fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8z"></path></svg>
 <span class="lang">{lang}</span>
 <span class="percent">{data.get("prop", 0):0.2f}%</span>
 </li>
