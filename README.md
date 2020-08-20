@@ -21,11 +21,7 @@ README](https://docs.github.com/en/github/setting-up-and-managing-your-github-pr
 
 <details>
 
-<summary>
-
-Click here to view installation instructions
-
-</summary>
+<summary> Click here to view installation instructions </summary>
 
 <!-- TODO -->
 TODO
@@ -49,11 +45,7 @@ TODO
 
 <details>
 
-<summary>
-
-Click here to see additional examples
-
-</summary>
+<summary> Click here to see additional examples </summary>
 
 - More to come later
 
