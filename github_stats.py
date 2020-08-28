@@ -56,7 +56,8 @@ class Queries(object):
             r = self.session.get(f"https://api.github.com/{path}",
                                  headers=headers, params=tuple(params.items()))
             if r.status_code == 202:
-                print(f"{path} returned 202. Retrying...")
+                # print(f"{path} returned 202. Retrying...")
+                print(f"A path returned 202. Retrying...")
                 time.sleep(1)
                 continue
             return r.json()
