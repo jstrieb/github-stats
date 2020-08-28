@@ -33,8 +33,8 @@ service would be unable to access.
 
 <!-- TODO: Add details and screenshots -->
 
-1. Create a personal access token (not the default GitHub Actions token)
-  - Personal access token must have permissions: `read:user` and `repo`
+1. Create a personal access token (not the default GitHub Actions token).
+   Personal access token must have permissions: `read:user` and `repo`
 2. Fork the repository
 3. Add a GitHub secret with the personal access token
 
