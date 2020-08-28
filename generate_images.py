@@ -10,7 +10,10 @@ from github_stats import Stats
 # Helper Functions
 ################################################################################
 
-def generate_output_folder():
+def generate_output_folder() -> None:
+    """
+    Create the output folder if it does not already exist
+    """
     if not os.path.isdir("generated"):
         os.mkdir("generated")
 
@@ -20,6 +23,10 @@ def generate_output_folder():
 ################################################################################
 
 def generate_overview(s: Stats) -> None:
+    """
+    Generate an SVG badge with summary statistics
+    :param s: Represents user's GitHub statistics
+    """
     with open("templates/overview.svg", "r") as f:
         output = f.read()
 
@@ -38,6 +45,10 @@ def generate_overview(s: Stats) -> None:
 
 
 def generate_languages(s: Stats) -> None:
+    """
+    Generate an SVG badge with summary languages used
+    :param s: Represents user's GitHub statistics
+    """
     with open("templates/languages.svg", "r") as f:
         output = f.read()
 
@@ -76,6 +87,9 @@ fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8z"></path></svg>
 ################################################################################
 
 def main() -> None:
+    """
+    Generate all badges
+    """
     access_token = os.getenv("ACCESS_TOKEN")
     user = os.getenv("GITHUB_ACTOR")
     s = Stats(user, access_token)
