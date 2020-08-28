@@ -413,7 +413,7 @@ Languages:
     @property
     def views(self) -> int:
         """
-        Note: only returns views for the last two weeks (as-per GitHub API)
+        Note: only returns views for the last 14 days (as-per GitHub API)
         :return: total number of page views the user's projects have received
         """
         if self._views is not None:
