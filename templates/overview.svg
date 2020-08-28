@@ -27,12 +27,6 @@ table {
   table-layout: auto;
 }
 
-/*
-table, th, td {
-  border: 1px solid black;
-}
-*/
-
 th {
   padding: 0.5em;
   padding-top: 0;
@@ -40,9 +34,6 @@ th {
   font-size: 14px;
   font-weight: 600;
   color: rgb(3, 102, 214);
-  animation-duration: 2s;
-  animation-name: fadeIn;
-  animation-function: ease-in-out;
 }
 
 td {
@@ -55,9 +46,11 @@ td {
 }
 
 tr {
+  transform: translateX(-200%);
   animation-duration: 2s;
   animation-name: slideIn;
   animation-function: ease-in-out;
+  animation-fill-mode: forwards;
 }
 
 .octicon {
@@ -67,14 +60,8 @@ tr {
 }
 
 @keyframes slideIn {
-  from {
-    transform: translateX(-200%);
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0
+  to {
+    transform: translateX(0);
   }
 }
 </style>
@@ -85,7 +72,7 @@ tr {
 <div xmlns="http://www.w3.org/1999/xhtml">
 
 <table>
-<thead><tr style="animation: none">
+<thead><tr style="transform: translateX(0);">
 <th colspan="2">{{ name }}'s GitHub Statistics</th>
 </tr></thead>
 <tbody>
