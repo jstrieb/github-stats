@@ -38,6 +38,7 @@ service would be unable to access.
    Personal access token must have permissions: `read:user` and `repo`
 2. Fork the repository
 3. Add a GitHub secret with the personal access token
+4. Star this repo if you like it!
 
 </details>
 
