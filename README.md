@@ -37,10 +37,19 @@ service would be unable to access.
 1. Create a personal access token (not the default GitHub Actions token) using
    the instructions
    [here](https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token).
-   Personal access token must have permissions: `read:user` and `repo`
-2. Fork the repository
-3. Add a GitHub secret with the personal access token
-4. Star this repo if you like it!
+   Personal access token must have permissions: `read:user` and `repo`. Copy
+   the access token when it is generated – if you lose it, you will have to
+   regenerate the token.
+2. Fork the repository.
+3. Go to the "Settings" tab of the fork and go to the "Secrets" page (bottom
+   left). Create a new secret with the name `ACCESS_TOKEN` and paste the copied
+   personal access token as the value.
+4. Go to the "Actions" tab of the fork and hit the big green button to enable
+   Actions.
+5. Commit a small change to the repo (for example remove a newline from the end
+   of the README) to force it to regenerate the stats images.
+6. Embed the images that have been created in the `generated` folder.
+5. Star this repo if you like it!
 
 </details>
 
