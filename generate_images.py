@@ -76,7 +76,8 @@ fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8z"></path></svg>
 
 def main() -> None:
     access_token = os.getenv("ACCESS_TOKEN")
-    s = Stats("jstrieb", access_token)
+    user = os.getenv("GITHUB_ACTOR")
+    s = Stats(user, access_token)
 
     generate_overview(s)
     generate_languages(s)

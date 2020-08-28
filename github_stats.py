@@ -357,30 +357,13 @@ Languages:
     def views(self) -> int:
         if self._views is not None:
             return self._views
-        try:
-            with open("data/views_log.json", "r") as f:
-                views = json.load(f)
-        except FileNotFoundError:
-            views = dict()
-
-        for repo in self.repos:
-            key = hashlib.md5(repo.encode("utf-8")).hexdigest()
-            if key not in views:
-                views[key] = dict()
-            r = self.queries.query_rest(f"/repos/{repo}/traffic/views")
-            for view in r.get("views", []):
-                views[key][view.get("timestamp")] = view
-            time.sleep(0.5)
-
-        if not os.path.isdir("data"):
-            os.mkdir("data")
-        with open("data/views_log.json", "w") as f:
-            json.dump(views, f, indent=2)
 
         total = 0
-        for repo in views.values():
-            for day in repo.values():
-                total += day.get("count", 0)
+        for repo in self.repos:
+            r = self.queries.query_rest(f"/repos/{repo}/traffic/views")
+            for view in r.get("views", []):
+                total += view.get("count", 0)
+            time.sleep(0.5)
 
         self._views = total
         return total
@@ -392,9 +375,9 @@ Languages:
 
 def main() -> None:
     access_token = os.getenv("ACCESS_TOKEN")
-    s = Stats("jstrieb", access_token)
-    print(json.dumps(s.languages, indent=2))
-    print(json.dumps(s.languages_proportional, indent=2))
+    user = os.getenv("GITHUB_ACTOR")
+    s = Stats(user, access_token)
+    print(s.views)
 
 
 if __name__ == "__main__":
