@@ -1,13 +1,10 @@
 #!/usr/bin/python3
 
-import json
-import hashlib
+import asyncio
 import os
-import time
-
 from typing import Dict, List, Optional, Set, Tuple
 
-import requests
+import aiohttp
 
 
 ###############################################################################
@@ -19,12 +16,15 @@ class Queries(object):
     Class with functions to query the GitHub GraphQL (v4) API and the REST (v3)
     API. Also includes functions to dynamically generate GraphQL queries.
     """
-    def __init__(self, username: str, access_token: str):
+
+    def __init__(self, username: str, access_token: str,
+                 session: aiohttp.ClientSession, max_connections: int = 10):
         self.username = username
         self.access_token = access_token
-        self.session = requests.Session()
+        self.session = session
+        self.semaphore = asyncio.Semaphore(max_connections)
 
-    def query(self, generated_query: str) -> Dict:
+    async def query(self, generated_query: str) -> Dict:
         """
         Make a request to the GraphQL API using the authentication token from
         the environment
@@ -34,11 +34,13 @@ class Queries(object):
         headers = {
             "Authorization": f"Bearer {self.access_token}",
         }
-        r = self.session.post("https://api.github.com/graphql", headers=headers,
-                              json={"query": generated_query})
-        return r.json()
+        async with self.semaphore:
+            r = await self.session.post("https://api.github.com/graphql",
+                                        headers=headers,
+                                        json={"query": generated_query})
+        return await r.json()
 
-    def query_rest(self, path: str, params: Optional[Dict] = None) -> Dict:
+    async def query_rest(self, path: str, params: Optional[Dict] = None) -> Dict:
         """
         Make a request to the REST API
         :param path: API path to query
@@ -53,14 +55,16 @@ class Queries(object):
                 params = dict()
             if path.startswith("/"):
                 path = path[1:]
-            r = self.session.get(f"https://api.github.com/{path}",
-                                 headers=headers, params=tuple(params.items()))
-            if r.status_code == 202:
+            async with self.semaphore:
+                r = await self.session.get(f"https://api.github.com/{path}",
+                                           headers=headers,
+                                           params=tuple(params.items()))
+            if r.status == 202:
                 # print(f"{path} returned 202. Retrying...")
                 print(f"A path returned 202. Retrying...")
-                time.sleep(1)
+                await asyncio.sleep(1)
                 continue
-            return r.json()
+            return await r.json()
 
     @staticmethod
     def repos_overview(contrib_cursor: Optional[str] = None,
@@ -194,10 +198,11 @@ class Stats(object):
     Retrieve and store statistics about GitHub usage.
     """
     def __init__(self, username: str, access_token: str,
+                 session: aiohttp.ClientSession,
                  exclude_repos: Optional[Set] = None):
         self.username = username
         self._exclude_repos = set() if exclude_repos is None else exclude_repos
-        self.queries = Queries(username, access_token)
+        self.queries = Queries(username, access_token, session)
 
         self._name = None
         self._stargazers = None
@@ -208,26 +213,28 @@ class Stats(object):
         self._lines_changed = None
         self._views = None
 
-    def __str__(self) -> str:
+    async def to_str(self) -> str:
         """
         :return: summary of all available statistics
         """
+        languages = await self.languages_proportional
         formatted_languages = "\n  - ".join(
-            [f"{k}: {v:0.4f}%" for k, v in self.languages_proportional.items()]
+            [f"{k}: {v:0.4f}%" for k, v in languages.items()]
         )
-        return f"""Name: {self.name}
-Stargazers: {self.stargazers:,}
-Forks: {self.forks:,}
-All-time contributions: {self.total_contributions:,}
-Repositories with contributions: {len(self.repos)}
-Lines of code added: {self.lines_changed[0]:,}
-Lines of code deleted: {self.lines_changed[1]:,}
-Lines of code changed: {self.lines_changed[0] + self.lines_changed[1]:,}
-Project page views: {self.views:,}
+        lines_changed = await self.lines_changed
+        return f"""Name: {await self.name}
+Stargazers: {await self.stargazers:,}
+Forks: {await self.forks:,}
+All-time contributions: {await self.total_contributions:,}
+Repositories with contributions: {len(await self.repos)}
+Lines of code added: {lines_changed[0]:,}
+Lines of code deleted: {lines_changed[1]:,}
+Lines of code changed: {lines_changed[0] + lines_changed[1]:,}
+Project page views: {await self.views:,}
 Languages:
   - {formatted_languages}"""
 
-    def get_stats(self) -> None:
+    async def get_stats(self) -> None:
         """
         Get lots of summary statistics using one big query. Sets many attributes
         """
@@ -239,7 +246,7 @@ Languages:
         next_owned = None
         next_contrib = None
         while True:
-            raw_results = self.queries.query(
+            raw_results = await self.queries.query(
                 Queries.repos_overview(owned_cursor=next_owned,
                                        contrib_cursor=next_contrib)
             )
@@ -272,11 +279,12 @@ Languages:
                     continue
                 for lang in repo.get("languages", {}).get("edges", []):
                     name = lang.get("node", {}).get("name", "Other")
-                    if name in self.languages:
-                        self.languages[name]["size"] += lang.get("size", 0)
-                        self.languages[name]["occurrences"] += 1
+                    languages = await self.languages
+                    if name in languages:
+                        languages[name]["size"] += lang.get("size", 0)
+                        languages[name]["occurrences"] += 1
                     else:
-                        self.languages[name] = {
+                        languages[name] = {
                             "size": lang.get("size", 0),
                             "occurrences": 1,
                             "color": lang.get("node", {}).get("color")
@@ -300,73 +308,73 @@ Languages:
             v["prop"] = 100 * (v.get("size", 0) / langs_total)
 
     @property
-    def name(self) -> str:
+    async def name(self) -> str:
         """
         :return: GitHub user's name (e.g., Jacob Strieb)
         """
         if self._name is not None:
             return self._name
-        self.get_stats()
+        await self.get_stats()
         assert(self._name is not None)
         return self._name
 
     @property
-    def stargazers(self) -> int:
+    async def stargazers(self) -> int:
         """
         :return: total number of stargazers on user's repos
         """
         if self._stargazers is not None:
             return self._stargazers
-        self.get_stats()
+        await self.get_stats()
         assert(self._stargazers is not None)
         return self._stargazers
 
     @property
-    def forks(self) -> int:
+    async def forks(self) -> int:
         """
         :return: total number of forks on user's repos
         """
         if self._forks is not None:
             return self._forks
-        self.get_stats()
+        await self.get_stats()
         assert(self._forks is not None)
         return self._forks
 
     @property
-    def languages(self) -> Dict:
+    async def languages(self) -> Dict:
         """
         :return: summary of languages used by the user
         """
         if self._languages is not None:
             return self._languages
-        self.get_stats()
+        await self.get_stats()
         assert(self._languages is not None)
         return self._languages
 
     @property
-    def languages_proportional(self) -> Dict:
+    async def languages_proportional(self) -> Dict:
         """
         :return: summary of languages used by the user, with proportional usage
         """
         if self._languages is None:
-            self.get_stats()
+            await self.get_stats()
             assert(self._languages is not None)
 
         return {k: v.get("prop", 0) for (k, v) in self._languages.items()}
 
     @property
-    def repos(self) -> List[str]:
+    async def repos(self) -> List[str]:
         """
         :return: list of names of user's repos
         """
         if self._repos is not None:
             return self._repos
-        self.get_stats()
+        await self.get_stats()
         assert(self._repos is not None)
         return self._repos
 
     @property
-    def total_contributions(self) -> int:
+    async def total_contributions(self) -> int:
         """
         :return: count of user's total contributions as defined by GitHub
         """
@@ -374,12 +382,12 @@ Languages:
             return self._total_contributions
 
         self._total_contributions = 0
-        years = self.queries.query(Queries.contrib_years()) \
+        years = (await self.queries.query(Queries.contrib_years())) \
             .get("data", {}) \
             .get("viewer", {}) \
             .get("contributionsCollection", {}) \
             .get("contributionYears", [])
-        by_year = self.queries.query(Queries.all_contribs(years)) \
+        by_year = (await self.queries.query(Queries.all_contribs(years))) \
             .get("data", {}) \
             .get("viewer", {}).values()
         for year in by_year:
@@ -389,7 +397,7 @@ Languages:
         return self._total_contributions
 
     @property
-    def lines_changed(self) -> Tuple[int, int]:
+    async def lines_changed(self) -> Tuple[int, int]:
         """
         :return: count of total lines added, removed, or modified by the user
         """
@@ -397,8 +405,8 @@ Languages:
             return self._lines_changed
         additions = 0
         deletions = 0
-        for repo in self.repos:
-            r = self.queries.query_rest(f"/repos/{repo}/stats/contributors")
+        for repo in await self.repos:
+            r = await self.queries.query_rest(f"/repos/{repo}/stats/contributors")
             for author_obj in r:
                 author = author_obj.get("author", {}).get("login", "")
                 if author != self.username:
@@ -407,13 +415,12 @@ Languages:
                 for week in author_obj.get("weeks", []):
                     additions += week.get("a", 0)
                     deletions += week.get("d", 0)
-            time.sleep(0.5)
 
         self._lines_changed = (additions, deletions)
         return self._lines_changed
 
     @property
-    def views(self) -> int:
+    async def views(self) -> int:
         """
         Note: only returns views for the last 14 days (as-per GitHub API)
         :return: total number of page views the user's projects have received
@@ -422,11 +429,10 @@ Languages:
             return self._views
 
         total = 0
-        for repo in self.repos:
-            r = self.queries.query_rest(f"/repos/{repo}/traffic/views")
+        for repo in await self.repos:
+            r = await self.queries.query_rest(f"/repos/{repo}/traffic/views")
             for view in r.get("views", []):
                 total += view.get("count", 0)
-            time.sleep(0.5)
 
         self._views = total
         return total
@@ -436,15 +442,16 @@ Languages:
 # Main Function
 ###############################################################################
 
-def main() -> None:
+async def main() -> None:
     """
     Used mostly for testing; this module is not usually run standalone
     """
     access_token = os.getenv("ACCESS_TOKEN")
     user = os.getenv("GITHUB_ACTOR")
-    s = Stats(user, access_token)
-    print(s.views)
+    async with aiohttp.ClientSession() as session:
+        s = Stats(user, access_token, session)
+        print(await s.to_str())
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

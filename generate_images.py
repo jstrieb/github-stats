@@ -1,7 +1,10 @@
 #!/usr/bin/python3
 
-import re
+import asyncio
 import os
+import re
+
+import aiohttp
 
 from github_stats import Stats
 
@@ -22,7 +25,7 @@ def generate_output_folder() -> None:
 # Individual Image Generation Functions
 ################################################################################
 
-def generate_overview(s: Stats) -> None:
+async def generate_overview(s: Stats) -> None:
     """
     Generate an SVG badge with summary statistics
     :param s: Represents user's GitHub statistics
@@ -30,21 +33,22 @@ def generate_overview(s: Stats) -> None:
     with open("templates/overview.svg", "r") as f:
         output = f.read()
 
-    output = re.sub("{{ name }}", s.name, output)
-    output = re.sub("{{ stars }}", f"{s.stargazers:,}", output)
-    output = re.sub("{{ forks }}", f"{s.forks:,}", output)
-    output = re.sub("{{ contributions }}", f"{s.total_contributions:,}", output)
-    changed = s.lines_changed[0] + s.lines_changed[1]
+    output = re.sub("{{ name }}", await s.name, output)
+    output = re.sub("{{ stars }}", f"{await s.stargazers:,}", output)
+    output = re.sub("{{ forks }}", f"{await s.forks:,}", output)
+    output = re.sub("{{ contributions }}", f"{await s.total_contributions:,}",
+                    output)
+    changed = (await s.lines_changed)[0] + (await s.lines_changed)[1]
     output = re.sub("{{ lines_changed }}", f"{changed:,}", output)
-    output = re.sub("{{ views }}", f"{s.views:,}", output)
-    output = re.sub("{{ repos }}", f"{len(s.repos):,}", output)
+    output = re.sub("{{ views }}", f"{await s.views:,}", output)
+    output = re.sub("{{ repos }}", f"{len(await s.repos):,}", output)
 
     generate_output_folder()
     with open("generated/overview.svg", "w") as f:
         f.write(output)
 
 
-def generate_languages(s: Stats) -> None:
+async def generate_languages(s: Stats) -> None:
     """
     Generate an SVG badge with summary languages used
     :param s: Represents user's GitHub statistics
@@ -54,7 +58,7 @@ def generate_languages(s: Stats) -> None:
 
     progress = ""
     lang_list = ""
-    sorted_languages = sorted(s.languages.items(), reverse=True,
+    sorted_languages = sorted((await s.languages).items(), reverse=True,
                               key=lambda t: t[1].get("size"))
     delay_between = 150
     for i, (lang, data) in enumerate(sorted_languages):
@@ -86,17 +90,16 @@ fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8z"></path></svg>
 # Main Function
 ################################################################################
 
-def main() -> None:
+async def main() -> None:
     """
     Generate all badges
     """
     access_token = os.getenv("ACCESS_TOKEN")
     user = os.getenv("GITHUB_ACTOR")
-    s = Stats(user, access_token)
-
-    generate_languages(s)
-    generate_overview(s)
+    async with aiohttp.ClientSession() as session:
+        s = Stats(user, access_token, session)
+        await asyncio.gather(generate_languages(s), generate_overview(s))
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
