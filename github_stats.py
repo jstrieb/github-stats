@@ -77,7 +77,6 @@ class Queries(object):
             field: UPDATED_AT,
             direction: DESC
         }},
-        isFork: false,
         after: {"null" if owned_cursor is None else '"'+ owned_cursor +'"'}
     ) {{
       pageInfo {{
@@ -113,8 +112,7 @@ class Queries(object):
             PULL_REQUEST,
             REPOSITORY,
             PULL_REQUEST_REVIEW
-        ],
-        isFork: false,
+        ]
         after: {"null" if contrib_cursor is None else '"'+ contrib_cursor +'"'}
     ) {{
       pageInfo {{
