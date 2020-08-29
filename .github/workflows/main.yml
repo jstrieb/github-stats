@@ -37,10 +37,11 @@ jobs:
         python3 -m pip install --upgrade pip setuptools wheel
         python3 -m pip install -r requirements.txt
 
-    # TODO: Remove
-    # Test querying the repo
+    # Generate all statistics images
     - name: Generate images
-      run: python3 generate_images.py
+      run: |
+        python3 --version
+        python3 generate_images.py
       env:
         ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
 
