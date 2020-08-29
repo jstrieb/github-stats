@@ -33,7 +33,9 @@ jobs:
 
     # Install dependencies with `pip`
     - name: Install requirements
-      run: python3 -m pip install -r requirements.txt
+      run: |
+        python3 -m pip install --upgrade pip setuptools wheel
+        python3 -m pip install -r requirements.txt
 
     # TODO: Remove
     # Test querying the repo
