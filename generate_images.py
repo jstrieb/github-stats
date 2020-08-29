@@ -94,8 +94,8 @@ def main() -> None:
     user = os.getenv("GITHUB_ACTOR")
     s = Stats(user, access_token)
 
-    generate_overview(s)
     generate_languages(s)
+    generate_overview(s)
 
 
 if __name__ == "__main__":
