@@ -5,6 +5,7 @@ import os
 from typing import Dict, List, Optional, Set, Tuple
 
 import aiohttp
+import requests
 
 
 ###############################################################################
@@ -34,11 +35,19 @@ class Queries(object):
         headers = {
             "Authorization": f"Bearer {self.access_token}",
         }
-        async with self.semaphore:
-            r = await self.session.post("https://api.github.com/graphql",
-                                        headers=headers,
-                                        json={"query": generated_query})
-        return await r.json()
+        try:
+            async with self.semaphore:
+                r = await self.session.post("https://api.github.com/graphql",
+                                            headers=headers,
+                                            json={"query": generated_query})
+            return await r.json()
+        except:
+            # Fall back on non-async requests
+            async with self.semaphore:
+                r = requests.post("https://api.github.com/graphql",
+                                  headers=headers,
+                                  json={"query": generated_query})
+                return r.json()
 
     async def query_rest(self, path: str, params: Optional[Dict] = None) -> Dict:
         """
@@ -56,19 +65,32 @@ class Queries(object):
                 params = dict()
             if path.startswith("/"):
                 path = path[1:]
-            async with self.semaphore:
-                r = await self.session.get(f"https://api.github.com/{path}",
-                                           headers=headers,
-                                           params=tuple(params.items()))
-            if r.status == 202:
-                # print(f"{path} returned 202. Retrying...")
-                print(f"A path returned 202. Retrying...")
-                await asyncio.sleep(1)
-                continue
+            try:
+                async with self.semaphore:
+                    r = await self.session.get(f"https://api.github.com/{path}",
+                                               headers=headers,
+                                               params=tuple(params.items()))
+                if r.status == 202:
+                    # print(f"{path} returned 202. Retrying...")
+                    print(f"A path returned 202. Retrying...")
+                    await asyncio.sleep(1)
+                    continue
 
-            result = await r.json()
-            if result is not None:
-                return result
+                result = await r.json()
+                if result is not None:
+                    return result
+            except:
+                # Fall back on non-async requests
+                async with self.semaphore:
+                    r = requests.get(f"https://api.github.com/{path}",
+                                     headers=headers,
+                                     params=tuple(params.items()))
+                    if r.status_code == 202:
+                        print(f"A path returned 202. Retrying...")
+                        await asyncio.sleep(1)
+                        continue
+
+                    return r.json()
 
     @staticmethod
     def repos_overview(contrib_cursor: Optional[str] = None,
