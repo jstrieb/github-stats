@@ -26,6 +26,16 @@ the analysis code themselves via GitHub Actions, they can use their GitHub
 access token to collect statistics on private repositories that an external
 service would be unable to access.
 
+## Disclaimer
+
+If the project is used with an access token that has sufficient permissions to
+read private repositories, it may leak details about those repositories in
+error messages. For example, the `aiohttp` library—used for asynchronous API
+requests—may include the requested URL in exceptions, which can leak the name
+of private repositories. If there is an exception caused by `aiohttp`, this
+exception will be viewable in the Actions tab of the repository fork, and
+anyone may be able to see the name of one or more private repositories.
+
 # Installation
 
 <details>
