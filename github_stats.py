@@ -47,6 +47,7 @@ class Queries(object):
         :param params: Query parameters to be passed to the API
         :return: deserialized REST JSON output
         """
+
         while True:
             headers = {
                 "Authorization": f"token {self.access_token}",
@@ -64,7 +65,10 @@ class Queries(object):
                 print(f"A path returned 202. Retrying...")
                 await asyncio.sleep(1)
                 continue
-            return await r.json()
+
+            result = await r.json()
+            if result is not None:
+                return result
 
     @staticmethod
     def repos_overview(contrib_cursor: Optional[str] = None,

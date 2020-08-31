@@ -52,8 +52,6 @@ jobs:
       env:
         ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
 
-    # TODO: Generate the images
-
     # Commits all changed files to the repository
     - name: Commit to the repo
       run: |
