@@ -1,5 +1,9 @@
 # GitHub Stats Visualization
 
+
+![](https://github.com/jstrieb/github-stats/blob/master/generated/overview.svg)
+![](https://github.com/jstrieb/github-stats/blob/master/generated/languages.svg)
+
 Generate visualizations of GitHub user and repository statistics using GitHub
 Actions.
 
@@ -38,10 +42,6 @@ anyone may be able to see the name of one or more private repositories.
 
 # Installation
 
-<details>
-
-<summary> Click here to view installation instructions </summary>
-
 <!-- TODO: Add details and screenshots -->
 
 1. Create a personal access token (not the default GitHub Actions token) using
@@ -61,17 +61,6 @@ anyone may be able to see the name of one or more private repositories.
 6. Check out the images that have been created in the `generated` folder.
 5. Star this repo if you like it!
 
-</details>
-
-# Examples
-
-- Stats overview
-
-  ![](https://github.com/jstrieb/github-stats/blob/master/generated/overview.svg)
-
-- Languages overview
-
-  ![](https://github.com/jstrieb/github-stats/blob/master/generated/languages.svg)
 
 # Related Projects
 
