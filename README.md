@@ -57,7 +57,9 @@ anyone may be able to see the name of one or more private repositories.
 4. Go to the "Actions" tab of the fork and hit the big green button to enable
    Actions.
 5. Commit a small change to the repo (for example remove a newline from the end
-   of the README) to force it to regenerate the stats images.
+   of the README) to force it to regenerate the stats images. The first time
+   that it generates the stats images, it may take a very long time. It does 
+   not generally take as long as the first time when it runs in the future.
 6. Check out the images that have been created in the `generated` folder.
 7. Link back to this repository so that others can generate their own 
    statistics images.
