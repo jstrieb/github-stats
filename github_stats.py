@@ -439,6 +439,10 @@ Languages:
         for repo in await self.repos:
             r = await self.queries.query_rest(f"/repos/{repo}/stats/contributors")
             for author_obj in r:
+                # Handle malformed response from the API by skipping this repo
+                if (not isinstance(author_obj, dict)
+                        or not isinstance(author_obj.get("author", {}), dict)):
+                    continue
                 author = author_obj.get("author", {}).get("login", "")
                 if author != self.username:
                     continue
