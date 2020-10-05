@@ -42,6 +42,7 @@ class Queries(object):
                                             json={"query": generated_query})
             return await r.json()
         except:
+            print("aiohttp failed for GraphQL query")
             # Fall back on non-async requests
             async with self.semaphore:
                 r = requests.post("https://api.github.com/graphql",
@@ -57,7 +58,7 @@ class Queries(object):
         :return: deserialized REST JSON output
         """
 
-        while True:
+        for _ in range(60):
             headers = {
                 "Authorization": f"token {self.access_token}",
             }
@@ -80,6 +81,7 @@ class Queries(object):
                 if result is not None:
                     return result
             except:
+                print("aiohttp failed for rest query")
                 # Fall back on non-async requests
                 async with self.semaphore:
                     r = requests.get(f"https://api.github.com/{path}",
@@ -89,8 +91,11 @@ class Queries(object):
                         print(f"A path returned 202. Retrying...")
                         await asyncio.sleep(1)
                         continue
-
-                    return r.json()
+                    elif r.status_code == 200:
+                        return r.json()
+        # print(f"There were too many 202s. Data for {path} will be incomplete.")
+        print("There were too many 202s. Data for this repository will be incomplete.")
+        return dict()
 
     @staticmethod
     def repos_overview(contrib_cursor: Optional[str] = None,
