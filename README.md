@@ -40,6 +40,14 @@ of private repositories. If there is an exception caused by `aiohttp`, this
 exception will be viewable in the Actions tab of the repository fork, and
 anyone may be able to see the name of one or more private repositories.
 
+Due to some issues with the GitHub statistics API, there are some situations
+where it returns inaccurate results. Specifically, the repository view count
+statistics and total lines of code modified are probably somewhat inaccurate.
+Unexpectedly, these values will become more accurate over time as GitHub
+caches statistics for your repositories. For more information, see issue
+[#2](https://github.com/jstrieb/github-stats/issues/2) and
+[#3](https://github.com/jstrieb/github-stats/issues/3).
+
 # Installation
 
 <!-- TODO: Add details and screenshots -->
