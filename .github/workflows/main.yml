@@ -51,12 +51,13 @@ jobs:
         python3 generate_images.py
       env:
         ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+        EXCLUDED: ${{ secrets.EXCLUDED }}
 
     # Commits all changed files to the repository
     - name: Commit to the repo
       run: |
-        git config --global user.name "GitHub Stats Bot"
-        git config --global user.email "jstrieb-stats[bot]@example.com"
+        git config --global user.name "jstrieb/github-stats"
+        git config --global user.email "github-stats[bot]@jstrieb.github.io"
         git add .
         # "echo" returns true so the build succeeds, even if no changed files
         git commit -m 'Update generated files' || echo
