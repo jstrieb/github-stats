@@ -64,14 +64,16 @@ caches statistics for your repositories. For more information, see issue
    personal access token as the value.
 4. Go to the "Actions" tab of the fork and hit the big green button to enable
    Actions.
-5. Commit a small change to the repo (for example remove a newline from the end
+5. If you want to ignore certain repos, add them (separated by commas) to a new
+   secret—created as before—called `EXCLUDED`.
+6. Commit a small change to the repo (for example remove a newline from the end
    of the README) to force it to regenerate the stats images. The first time
    that it generates the stats images, it may take a ~very~ long time. It does 
    not generally take as long as the first time when it runs in the future.
-6. Check out the images that have been created in the `generated` folder.
-7. Link back to this repository so that others can generate their own 
+7. Check out the images that have been created in the `generated` folder.
+8. Link back to this repository so that others can generate their own 
    statistics images.
-8. Star this repo if you like it!
+9. Star this repo if you like it!
 
 
 # Related Projects
