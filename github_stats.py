@@ -297,11 +297,10 @@ Languages:
                            .get("repositories", {}))
             repos = (contrib_repos.get("nodes", [])
                      + owned_repos.get("nodes", []))
-            repos = [r for r in repos if r not in self._exclude_repos]
 
             for repo in repos:
                 name = repo.get("nameWithOwner")
-                if name in self._repos:
+                if name in self._repos or name in self._exclude_repos:
                     continue
                 self._repos.add(name)
                 self._stargazers += repo.get("stargazers").get("totalCount", 0)
