@@ -297,6 +297,7 @@ Languages:
                            .get("repositories", {}))
             repos = (contrib_repos.get("nodes", [])
                      + owned_repos.get("nodes", []))
+            repos = [r for r in repos if r not in self._exclude_repos]
 
             for repo in repos:
                 name = repo.get("nameWithOwner")
@@ -306,8 +307,6 @@ Languages:
                 self._stargazers += repo.get("stargazers").get("totalCount", 0)
                 self._forks += repo.get("forkCount", 0)
 
-                if name in self._exclude_repos:
-                    continue
                 for lang in repo.get("languages", {}).get("edges", []):
                     name = lang.get("node", {}).get("name", "Other")
                     languages = await self.languages
