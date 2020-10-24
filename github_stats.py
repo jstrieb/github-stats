@@ -105,7 +105,8 @@ class Queries(object):
         """
         return f"""{{
   viewer {{
-    name
+    login,
+    name,
     repositories(
         first: 100,
         orderBy: {{
@@ -285,7 +286,12 @@ Languages:
             self._name = (raw_results
                           .get("data", {})
                           .get("viewer", {})
-                          .get("name", "No Name"))
+                          .get("name", None))
+            if self._name is None:
+                self._name = (raw_results
+                              .get("data", {})
+                              .get("viewer", {})
+                              .get("login", "No Name"))
 
             contrib_repos = (raw_results
                              .get("data", {})
