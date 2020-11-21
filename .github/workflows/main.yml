@@ -9,15 +9,12 @@ on:
   schedule:
     - cron: "0 * * * *"
 
-# A workflow run is made up of one or more jobs that can run sequentially or in
-# parallel
 jobs:
-  # This workflow contains a single job called "build"
   build:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
-    # Sequence of tasks that will be executed as part of the job
+    # Sequence of tasks that will be executed as part of the job steps:
     steps:
     # Checks-out repository under $GITHUB_WORKSPACE, so the job can access it
     - uses: actions/checkout@v2
@@ -47,18 +44,54 @@ jobs:
     # Generate all statistics images
     - name: Generate images
       run: |
-        python3 --version
         python3 generate_images.py
       env:
         ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
         EXCLUDED: ${{ secrets.EXCLUDED }}
 
-    # Commits all changed files to the repository
-    - name: Commit to the repo
+    # Set variables corresponding to the current date in different forms
+    - name: Set Datestrings
+      id: set_datestrings
       run: |
-        git config --global user.name "jstrieb/github-stats"
-        git config --global user.email "github-stats[bot]@jstrieb.github.io"
-        git add .
-        # "echo" returns true so the build succeeds, even if no changed files
-        git commit -m 'Update generated files' || echo
-        git push
+        echo "::set-output name=date_num::$(date +%Y%m%d%H%M%S)"
+        echo "::set-output name=date_text::$(date '+%A, %B %d, %Y %H:%M:%S')"
+
+    # Create a new release for the generated images
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.set_datestrings.outputs.date_num }}
+        release_name: ${{ steps.set_datestrings.outputs.date_text }}
+
+    # Upload the generated images to the latest release
+    - name: Upload Overview
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./generated/overview.svg
+        asset_name: overview.svg
+        asset_content_type: image/svg+xml
+    - name: Upload Languages
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./generated/languages.svg
+        asset_name: languages.svg
+        asset_content_type: image/svg+xml
+
+    # Commits all changed files to the repository
+    # - name: Commit to the repo
+    #  run: |
+    #    git config --global user.name "jstrieb/github-stats"
+    #    git config --global user.email "github-stats[bot]@jstrieb.github.io"
+    #    git add .
+    #    # "echo" returns true so the build succeeds, even if no changed files
+    #    git commit -m 'Update generated files' || echo
+    #    git push
