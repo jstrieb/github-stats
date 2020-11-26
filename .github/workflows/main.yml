@@ -51,7 +51,7 @@ jobs:
         python3 generate_images.py
       env:
         ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
-        EXCLUDED: 'wopian/github-stats,jstrieb/github-stats' # ${{ secrets.EXCLUDED }}
+        EXCLUDED: 'wopian/github-stats,jstrieb/github-stats,wopian/kitsu-csp,wopian/wopian.moe,wopian/codingame,wopian/wwmcc,wopian/skylark,wopian/whatpulse-stats' # ${{ secrets.EXCLUDED }}
 
     # Commits all changed files to the repository
     - name: Commit to the repo
