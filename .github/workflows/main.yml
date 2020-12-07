@@ -56,8 +56,8 @@ jobs:
     # Commits all changed files to the repository
     - name: Commit to the repo
       run: |
-        git config --global user.name ${ secrets.GH_USERNAME }
-        git config --global user.email ${ secrets.GH_EMAIL }
+        git config --global user.name ${{ secrets.GH_USERNAME }}
+        git config --global user.email ${{ secrets.GH_EMAIL }}
         git add .
         # "echo" returns true so the build succeeds, even if no changed files
         git commit -m 'Update generated files' || echo
