@@ -1,17 +1,10 @@
-# [GitHub Stats Visualization](https://github.com/jstrieb/github-stats)
-
-<a href="https://github.com/jstrieb/github-stats">
+# GitHub Stats
    
-![](https://github.com/wopian/github-stats/blob/master/generated/overview.svg)
-![](https://github.com/wopian/github-stats/blob/master/generated/languages.svg)
-
-</a>
+![](generated/overview.svg)
+![](generated/languages.svg)
 
 Generate visualizations of GitHub user and repository statistics using GitHub
 Actions.
-
-This project is currently a work-in-progress; there will always be more
-interesting stats to display.
 
 ## Background
 
@@ -77,11 +70,3 @@ caches statistics for your repositories. For more information, see issue
 8. Link back to this repository so that others can generate their own 
    statistics images.
 9. Star this repo if you like it!
-
-
-# Related Projects
-
-- Inspired by a desire to improve upon
-  [anuraghazra/github-readme-stats](https://github.com/anuraghazra/github-readme-stats)
-- Makes use of [GitHub Octicons](https://primer.style/octicons/) to precisely
-  match the GitHub UI
