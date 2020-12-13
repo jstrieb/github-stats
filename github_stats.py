@@ -282,6 +282,7 @@ Languages:
                 Queries.repos_overview(owned_cursor=next_owned,
                                        contrib_cursor=next_contrib)
             )
+            raw_results = raw_results if raw_results is not None else {}
 
             self._name = (raw_results
                           .get("data", {})
