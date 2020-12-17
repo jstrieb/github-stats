@@ -231,9 +231,11 @@ class Stats(object):
     """
     def __init__(self, username: str, access_token: str,
                  session: aiohttp.ClientSession,
-                 exclude_repos: Optional[Set] = None):
+                 exclude_repos: Optional[Set] = None,
+                 exclude_langs: Optional[Set] = None):
         self.username = username
         self._exclude_repos = set() if exclude_repos is None else exclude_repos
+        self._exclude_langs = set() if exclude_langs is None else exclude_langs
         self.queries = Queries(username, access_token, session)
 
         self._name = None
@@ -316,6 +318,7 @@ Languages:
                 for lang in repo.get("languages", {}).get("edges", []):
                     name = lang.get("node", {}).get("name", "Other")
                     languages = await self.languages
+                    if name in self._exclude_langs: continue
                     if name in languages:
                         languages[name]["size"] += lang.get("size", 0)
                         languages[name]["occurrences"] += 1
