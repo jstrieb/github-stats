@@ -70,7 +70,9 @@ caches statistics for your repositories. For more information, see issue
 4. Create a new secret with the name `ACCESS_TOKEN` and paste the copied
    personal access token as the value.
 5. If you want to ignore certain repos, add them (separated by commas) to a new
-   secret—created as before—called `EXCLUDED`.
+   secret—created as before—called `EXCLUDED`. If you want to ignore certain 
+   languages, add them (separated by commas) to a new secret called 
+   `EXCLUDED_LANGS`.
 6. Go to the [Actions
    Page](../../actions?query=workflow%3A"Generate+Stats+Images") and press "Run
    Workflow" on the right side of the screen to generate images for the first
