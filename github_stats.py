@@ -114,6 +114,7 @@ class Queries(object):
             direction: DESC
         }},
         isFork: false,
+        ownerAffiliations: [OWNER, COLLABORATOR, ORGANIZATION_MEMBER],
         after: {"null" if owned_cursor is None else '"'+ owned_cursor +'"'}
     ) {{
       pageInfo {{
@@ -126,7 +127,7 @@ class Queries(object):
           totalCount
         }}
         forkCount
-        languages(first: 10, orderBy: {{field: SIZE, direction: DESC}}) {{
+        languages(first: 50, orderBy: {{field: SIZE, direction: DESC}}) {{
           edges {{
             size
             node {{
