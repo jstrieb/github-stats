@@ -263,7 +263,7 @@ Languages:
 
             contrib_repos = (raw_results
                              .get("data", {})
-                             .get("viewer", {})
+                             .get("viewer", {}))
 
             owned_repos = (raw_results
                            .get("data", {})
