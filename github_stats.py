@@ -138,42 +138,6 @@ class Queries(object):
         }}
       }}
     }}
-    repositoriesContributedTo(
-        first: 100,
-        includeUserRepositories: false,
-        orderBy: {{
-            field: UPDATED_AT,
-            direction: DESC
-        }},
-        contributionTypes: [
-            COMMIT,
-            PULL_REQUEST,
-            REPOSITORY,
-            PULL_REQUEST_REVIEW
-        ]
-        after: {"null" if contrib_cursor is None else '"'+ contrib_cursor +'"'}
-    ) {{
-      pageInfo {{
-        hasNextPage
-        endCursor
-      }}
-      nodes {{
-        nameWithOwner
-        stargazers {{
-          totalCount
-        }}
-        forkCount
-        languages(first: 10, orderBy: {{field: SIZE, direction: DESC}}) {{
-          edges {{
-            size
-            node {{
-              name
-              color
-            }}
-          }}
-        }}
-      }}
-    }}
   }}
 }}
 """
@@ -300,7 +264,7 @@ Languages:
             contrib_repos = (raw_results
                              .get("data", {})
                              .get("viewer", {})
-                             .get("repositoriesContributedTo", {}))
+
             owned_repos = (raw_results
                            .get("data", {})
                            .get("viewer", {})
