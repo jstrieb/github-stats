@@ -4,6 +4,7 @@ name: Generate Stats Images
 
 # Controls when the action will run. Triggers the workflow on push events
 on:
+  workflow_dispatch:
   push:
     branches: [ master ]
   schedule:
@@ -51,7 +52,8 @@ jobs:
         python3 generate_images.py
       env:
         ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
-        EXCLUDED: 'wopian/github-stats,jstrieb/github-stats,wopian/kitsu-csp,wopian/wopian.moe,wopian/codingame,wopian/wwmcc,wopian/skylark,wopian/whatpulse-stats,jwoods02/Mosaic-Island-Timesheet-System' # ${{ secrets.EXCLUDED }}
+        EXCLUDED: 'wopian/github-stats,jstrieb/github-stats,wopian/kitsu-csp,wopian/wopian.moe,wopian/codingame,wopian/wwmcc,wopian/skylark,wopian/whatpulse-stats,jwoods02/Mosaic-Island-Timesheet-System'
+        EXCLUDED_LANGS: 'php'
 
     # Commits all changed files to the repository
     - name: Commit to the repo

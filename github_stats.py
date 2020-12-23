@@ -110,11 +110,10 @@ class Queries(object):
     repositories(
         first: 100,
         orderBy: {{
-            field: PUSHED_AT,
+            field: UPDATED_AT,
             direction: DESC
         }},
         isFork: false,
-        ownerAffiliations: [OWNER, COLLABORATOR, ORGANIZATION_MEMBER],
         after: {"null" if owned_cursor is None else '"'+ owned_cursor +'"'}
     ) {{
       pageInfo {{
@@ -127,7 +126,43 @@ class Queries(object):
           totalCount
         }}
         forkCount
-        languages(first: 25, orderBy: {{field: SIZE, direction: DESC}}) {{
+        languages(first: 10, orderBy: {{field: SIZE, direction: DESC}}) {{
+          edges {{
+            size
+            node {{
+              name
+              color
+            }}
+          }}
+        }}
+      }}
+    }}
+    repositoriesContributedTo(
+        first: 100,
+        includeUserRepositories: false,
+        orderBy: {{
+            field: UPDATED_AT,
+            direction: DESC
+        }},
+        contributionTypes: [
+            COMMIT,
+            PULL_REQUEST,
+            REPOSITORY,
+            PULL_REQUEST_REVIEW
+        ]
+        after: {"null" if contrib_cursor is None else '"'+ contrib_cursor +'"'}
+    ) {{
+      pageInfo {{
+        hasNextPage
+        endCursor
+      }}
+      nodes {{
+        nameWithOwner
+        stargazers {{
+          totalCount
+        }}
+        forkCount
+        languages(first: 10, orderBy: {{field: SIZE, direction: DESC}}) {{
           edges {{
             size
             node {{
@@ -196,9 +231,11 @@ class Stats(object):
     """
     def __init__(self, username: str, access_token: str,
                  session: aiohttp.ClientSession,
-                 exclude_repos: Optional[Set] = None):
+                 exclude_repos: Optional[Set] = None,
+                 exclude_langs: Optional[Set] = None):
         self.username = username
         self._exclude_repos = set() if exclude_repos is None else exclude_repos
+        self._exclude_langs = set() if exclude_langs is None else exclude_langs
         self.queries = Queries(username, access_token, session)
 
         self._name = None
@@ -223,7 +260,7 @@ class Stats(object):
 Stargazers: {await self.stargazers:,}
 Forks: {await self.forks:,}
 All-time contributions: {await self.total_contributions:,}
-Repositories contributed to: {len(await self.repos)}
+Repositories with contributions: {len(await self.repos)}
 Lines of code added: {lines_changed[0]:,}
 Lines of code deleted: {lines_changed[1]:,}
 Lines of code changed: {lines_changed[0] + lines_changed[1]:,}
@@ -247,6 +284,7 @@ Languages:
                 Queries.repos_overview(owned_cursor=next_owned,
                                        contrib_cursor=next_contrib)
             )
+            raw_results = raw_results if raw_results is not None else {}
 
             self._name = (raw_results
                           .get("data", {})
@@ -260,7 +298,8 @@ Languages:
 
             contrib_repos = (raw_results
                              .get("data", {})
-                             .get("viewer", {}))
+                             .get("viewer", {})
+                             .get("repositoriesContributedTo", {}))
             owned_repos = (raw_results
                            .get("data", {})
                            .get("viewer", {})
@@ -279,6 +318,7 @@ Languages:
                 for lang in repo.get("languages", {}).get("edges", []):
                     name = lang.get("node", {}).get("name", "Other")
                     languages = await self.languages
+                    if name in self._exclude_langs: continue
                     if name in languages:
                         languages[name]["size"] += lang.get("size", 0)
                         languages[name]["occurrences"] += 1
