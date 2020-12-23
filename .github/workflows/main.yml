@@ -45,7 +45,8 @@ jobs:
         python3 -m pip install -r requirements.txt
 
     # Generate all statistics images
-    - name: Generate images
+    - if: secrets.RANDOM_TOKEN
+      name: Generate images
       run: |
         python3 --version
         python3 generate_images.py
@@ -54,7 +55,8 @@ jobs:
         EXCLUDED: 'wopian/github-stats,jstrieb/github-stats,wopian/kitsu-csp,wopian/wopian.moe,wopian/codingame,wopian/wwmcc,wopian/skylark,wopian/whatpulse-stats,jwoods02/Mosaic-Island-Timesheet-System' # ${{ secrets.EXCLUDED }}
 
     # Commits all changed files to the repository
-    - name: Commit to the repo
+    - if: secrets.RANDOM_TOKEN
+      name: Commit to the repo
       run: |
         git config --global user.name ${{ secrets.GH_USERNAME }}
         git config --global user.email ${{ secrets.GH_EMAIL }}
