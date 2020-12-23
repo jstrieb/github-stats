@@ -53,7 +53,7 @@ jobs:
       env:
         ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
         EXCLUDED: 'wopian/github-stats,jstrieb/github-stats,wopian/kitsu-csp,wopian/wopian.moe,wopian/codingame,wopian/wwmcc,wopian/skylark,wopian/whatpulse-stats,jwoods02/Mosaic-Island-Timesheet-System'
-        EXCLUDED_LANGS: 'PHP,Java,HTML,YAML'
+        EXCLUDED_LANGS: 'PHP,Java,HTML,YAML,INI'
 
     # Commits all changed files to the repository
     - name: Commit to the repo
