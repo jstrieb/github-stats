@@ -17,8 +17,10 @@ svg {
 }
 
 foreignObject {
+  /*
   width: calc(100% - 10px - 32px);
   height: calc(100% - 10px - 32px);
+  */
 }
 
 table {
@@ -65,10 +67,10 @@ tr {
   }
 }
 </style>
-<g transform="translate(5, 5)">
+<g x="5" y="5">
 <rect id="background" />
-<g transform="translate(16, 16)">
-<foreignObject>
+<g>
+<foreignObject x="16" y="16" width="318" height="168">
 <div xmlns="http://www.w3.org/1999/xhtml">
 
 <table>
