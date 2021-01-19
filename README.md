@@ -47,9 +47,14 @@ Due to some issues with the GitHub statistics API, there are some situations
 where it returns inaccurate results. Specifically, the repository view count
 statistics and total lines of code modified are probably somewhat inaccurate.
 Unexpectedly, these values will become more accurate over time as GitHub
-caches statistics for your repositories. For more information, see issue
-[#2](https://github.com/jstrieb/github-stats/issues/2) and
-[#3](https://github.com/jstrieb/github-stats/issues/3).
+caches statistics for your repositories. Additionally, repositories that were
+last contributed to more than a year ago may not be included in the statistics
+due to limitations in the results returned by the API.
+
+For more information on inaccuracies, see issue
+[#2](https://github.com/jstrieb/github-stats/issues/2),
+[#3](https://github.com/jstrieb/github-stats/issues/3), and
+[#13](https://github.com/jstrieb/github-stats/issues/13).
 
 # Installation
 
