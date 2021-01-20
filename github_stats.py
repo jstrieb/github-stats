@@ -246,6 +246,10 @@ class Stats(object):
         self._repos = None
         self._lines_changed = None
         self._views = None
+        
+        self._ignore_forked_repositories = False
+        if len(os.getenv("IGNORE_FORKED_REPOSITORIES")) != 0:
+            self._ignore_forked_repositories = True
 
     async def to_str(self) -> str:
         """
@@ -304,8 +308,11 @@ Languages:
                            .get("data", {})
                            .get("viewer", {})
                            .get("repositories", {}))
-            repos = (contrib_repos.get("nodes", [])
-                     + owned_repos.get("nodes", []))
+            
+            repos = owned_repos.get("nodes", [])
+            if not self._ignore_forked_repositories:
+                # count contributed repos only if flag is not set
+                repos += contrib_repos.get("nodes", [])
 
             for repo in repos:
                 name = repo.get("nameWithOwner")
