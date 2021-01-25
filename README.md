@@ -74,10 +74,16 @@ For more information on inaccuracies, see issue
    to the "Secrets" page (bottom left).
 4. Create a new secret with the name `ACCESS_TOKEN` and paste the copied
    personal access token as the value.
-5. If you want to ignore certain repos, add them (separated by commas) to a new
-   secret—created as before—called `EXCLUDED`. If you want to ignore certain 
-   languages, add them (separated by commas) to a new secret called 
-   `EXCLUDED_LANGS`.
+5. It is possible to change the type of statistics reported.
+   - To ignore certain repos, add them (separated by commas) to a new
+     secret—created as before—called `EXCLUDED`.
+   - To ignore certain languages, add them (separated by commas) to a new
+     secret called `EXCLUDED_LANGS`.
+   - To show statistics only for "owned" repositories and not forks with
+     contributions, add an environment variable (under the `env` header in the
+     [main
+     workflow](https://github.com/jstrieb/github-stats/blob/master/.github/workflows/main.yml)
+     called `EXCLUDE_FORKED_REPOS` with a value of `true`.
 6. Go to the [Actions
    Page](../../actions?query=workflow%3A"Generate+Stats+Images") and press "Run
    Workflow" on the right side of the screen to generate images for the first
