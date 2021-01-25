@@ -232,8 +232,10 @@ class Stats(object):
     def __init__(self, username: str, access_token: str,
                  session: aiohttp.ClientSession,
                  exclude_repos: Optional[Set] = None,
-                 exclude_langs: Optional[Set] = None):
+                 exclude_langs: Optional[Set] = None,
+                 ignore_forked_repos: bool = False):
         self.username = username
+        self._ignore_forked_repos = ignore_forked_repos
         self._exclude_repos = set() if exclude_repos is None else exclude_repos
         self._exclude_langs = set() if exclude_langs is None else exclude_langs
         self.queries = Queries(username, access_token, session)
@@ -246,10 +248,6 @@ class Stats(object):
         self._repos = None
         self._lines_changed = None
         self._views = None
-        
-        self._ignore_forked_repositories = False
-        if len(os.getenv("IGNORE_FORKED_REPOSITORIES")) != 0:
-            self._ignore_forked_repositories = True
 
     async def to_str(self) -> str:
         """
@@ -308,10 +306,9 @@ Languages:
                            .get("data", {})
                            .get("viewer", {})
                            .get("repositories", {}))
-            
+
             repos = owned_repos.get("nodes", [])
-            if not self._ignore_forked_repositories:
-                # count contributed repos only if flag is not set
+            if not self._ignore_forked_repos:
                 repos += contrib_repos.get("nodes", [])
 
             for repo in repos:
