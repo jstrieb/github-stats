@@ -40,7 +40,9 @@ class Queries(object):
                 r = await self.session.post("https://api.github.com/graphql",
                                             headers=headers,
                                             json={"query": generated_query})
-            return await r.json()
+            result = await r.json()
+            if result is not None:
+                return result
         except:
             print("aiohttp failed for GraphQL query")
             # Fall back on non-async requests
@@ -48,7 +50,10 @@ class Queries(object):
                 r = requests.post("https://api.github.com/graphql",
                                   headers=headers,
                                   json={"query": generated_query})
-                return r.json()
+                result = r.json()
+                if result is not None:
+                    return result
+        return dict()
 
     async def query_rest(self, path: str, params: Optional[Dict] = None) -> Dict:
         """
@@ -312,6 +317,8 @@ Languages:
                 repos += contrib_repos.get("nodes", [])
 
             for repo in repos:
+                if repo is None:
+                    continue
                 name = repo.get("nameWithOwner")
                 if name in self._repos or name in self._exclude_repos:
                     continue
