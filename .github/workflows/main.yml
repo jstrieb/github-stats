@@ -22,6 +22,8 @@ jobs:
     steps:
     # Checks-out repository under $GITHUB_WORKSPACE, so the job can access it
     - uses: actions/checkout@v2
+      with:
+        repository: jstrieb/github-stats
 
     # Run using Python 3.8 for consistency and aiohttp
     - name: Set up Python 3.8
