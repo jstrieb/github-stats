@@ -23,6 +23,12 @@ jobs:
     # Checks-out repository under $GITHUB_WORKSPACE, so the job can access it
     - uses: actions/checkout@v2
       with:
+        path: ./github-stats
+        repository: jstrieb/github-stats
+        
+    - uses: actions/checkout@v2
+      with:
+        path: ./current-repo
         repository: jstrieb/github-stats
 
     # Run using Python 3.8 for consistency and aiohttp
@@ -44,12 +50,14 @@ jobs:
     # Install dependencies with `pip`
     - name: Install requirements
       run: |
+        cd ./github-stats
         python3 -m pip install --upgrade pip setuptools wheel
         python3 -m pip install -r requirements.txt
 
     # Generate all statistics images
     - name: Generate images
       run: |
+        cd ./github-stats
         python3 --version
         python3 generate_images.py
       env:
@@ -61,6 +69,7 @@ jobs:
     # Commits all changed files to the repository
     - name: Commit to the repo
       run: |
+        cd ./current-repo
         git config --global user.name "jstrieb/github-stats"
         git config --global user.email "github-stats[bot]@jstrieb.github.io"
         git add .
