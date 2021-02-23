@@ -94,6 +94,7 @@ async def main() -> None:
     """
     Generate all badges
     """
+    os.chdir("../current-repo")
     access_token = os.getenv("ACCESS_TOKEN")
     if not access_token:
         # access_token = os.getenv("GITHUB_TOKEN")
