@@ -24,12 +24,11 @@ jobs:
     - uses: actions/checkout@v2
       with:
         path: ./github-stats
-        repository: jstrieb/github-stats
+        repository: PassionPenguin/github-stats
         
     - uses: actions/checkout@v2
       with:
         path: ./current-repo
-        repository: jstrieb/github-stats
 
     # Run using Python 3.8 for consistency and aiohttp
     - name: Set up Python 3.8
