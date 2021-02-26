@@ -75,8 +75,9 @@ For more information on inaccuracies, see issue
 4. Create a new secret with the name `ACCESS_TOKEN` and paste the copied
    personal access token as the value.
 5. It is possible to change the type of statistics reported.
-   - To ignore certain repos, add them (separated by commas) to a new
-     secret—created as before—called `EXCLUDED`.
+   - To ignore certain repos, add them (in owner/name format e.g.,
+     `jstrieb/github-stats`) separated by commas to a new secret—created as
+     before—called `EXCLUDED`.
    - To ignore certain languages, add them (separated by commas) to a new
      secret called `EXCLUDED_LANGS`.
    - To show statistics only for "owned" repositories and not forks with
