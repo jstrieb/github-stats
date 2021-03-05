@@ -67,7 +67,8 @@ For more information on inaccuracies, see issue
    the access token when it is generated – if you lose it, you will have to
    regenerate the token.
 2. Click [here](https://github.com/jstrieb/github-stats/generate) to create a
-   fork of this repository
+   copy of this repository. Note: this is not the same as forking a copy
+   because it copies everything fresh, without the huge commit history. 
 3. If this is the README of your fork, click [this
    link](../../settings/secrets/actions) to go to the "Secrets" page.
    Otherwise, go to the "Settings" tab of the newly-created repository and go
