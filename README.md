@@ -98,6 +98,32 @@ For more information on inaccuracies, see issue
 9. Star this repo if you like it!
 
 
+# Support the Project
+
+There are a few ways to support this project.
+
+Most importantly: star this repository and follow me on GitHub. These things
+motivate me to to keep sharing what I build, and they provide validation that
+my work is appreciated. In the same vein, please consider sharing the project
+on platforms like Reddit and Twitter.
+
+Stars on GitHub also help me gauge who is making use of the project – since I
+do not include tracking or analytics in this or any project, I have no idea how
+many people use what I build unless they deliberately take action to notify me.
+If GitHub is not your style, reach out to me on my [contact
+page](https://jstrieb.github.io/about/#contact) and say "hello" instead! 
+
+If you are insistent on spending money to show your support, I encourage you to
+make a generous donation to one of the following organizations. By advocating
+for Internet freedoms, organizations like these help me to feel comfortable
+releasing work publicly on the Web.
+
+- [Electronic Frontier Foundation](https://supporters.eff.org/donate/).
+- [Signal Foundation](https://signal.org/donate/)
+- [Mozilla](https://donate.mozilla.org/en-US/)
+- [The Internet Archive](https://archive.org/donate/index.php)
+
+
 # Related Projects
 
 - Inspired by a desire to improve upon
