@@ -118,7 +118,7 @@ make a generous donation to one of the following organizations. By advocating
 for Internet freedoms, organizations like these help me to feel comfortable
 releasing work publicly on the Web.
 
-- [Electronic Frontier Foundation](https://supporters.eff.org/donate/).
+- [Electronic Frontier Foundation](https://supporters.eff.org/donate/)
 - [Signal Foundation](https://signal.org/donate/)
 - [Mozilla](https://donate.mozilla.org/en-US/)
 - [The Internet Archive](https://archive.org/donate/index.php)
