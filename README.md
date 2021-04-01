@@ -66,6 +66,9 @@ For more information on inaccuracies, see issue
    Personal access token must have permissions: `read:user` and `repo`. Copy
    the access token when it is generated – if you lose it, you will have to
    regenerate the token.
+   - Some users are reporting that it can take a few minutes for the personal
+     access token to work. For more, see 
+     [#30](https://github.com/jstrieb/github-stats/issues/30).
 2. Click [here](https://github.com/jstrieb/github-stats/generate) to create a
    copy of this repository. Note: this is not the same as forking a copy
    because it copies everything fresh, without the huge commit history. 
