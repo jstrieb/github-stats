@@ -26,7 +26,7 @@ jobs:
     - name: Configure GPG Key
       run: echo -n "$GPG_KEY" | gpg --import
       env:
-        GPG_PUBLIC_KEY: ${{ secrets.GPG_KEY }}
+        GPG_KEY: ${{ secrets.GPG_KEY }}
 
     # Run using Python 3.8 for consistency and aiohttp
     - name: Set up Python 3.8
