@@ -69,5 +69,5 @@ jobs:
         git config --global commit.gpgsign true
         git add .
         # "echo" returns true so the build succeeds, even if no changed files
-        git commit -s -m 'Update generated files' || echo
+        git commit -m 'Update generated files' || echo
         git push
