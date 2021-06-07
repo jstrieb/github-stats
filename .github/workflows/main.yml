@@ -23,6 +23,11 @@ jobs:
     # Checks-out repository under $GITHUB_WORKSPACE, so the job can access it
     - uses: actions/checkout@v2
 
+    - name: Configure GPG Key
+      run: echo -n "$GPG_KEY" | gpg --import
+      env:
+        GPG_KEY: ${{ secrets.GPG_KEY }}
+
     # Run using Python 3.8 for consistency and aiohttp
     - name: Set up Python 3.8
       uses: actions/setup-python@v2
@@ -62,5 +67,5 @@ jobs:
         git config --global user.email ${{ secrets.GH_EMAIL }}
         git add .
         # "echo" returns true so the build succeeds, even if no changed files
-        git commit -m 'Update generated files' || echo
+        git commit -mS 'Update generated files' || echo
         git push
