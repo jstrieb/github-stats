@@ -11,9 +11,10 @@ from github_stats import Stats
 import config as c
 
 # Quick fix for error prevention:
-c.import_path += '/' if c.import_path[-1] != '/' else ''
-c.export_path += '/' if c.export_path[-1] != '/' else ''
-c.enclosing_directory += '/' if c.enclosing_directory[-1] != '/' else ''
+c.import_path += '/' if c.import_path and c.import_path[-1] != '/' else ''
+c.export_path += '/' if c.export_path and c.export_path[-1] != '/' else ''
+c.enclosing_directory += '/' if (c.enclosing_directory
+                                 and c.enclosing_directory[-1] != '/') else ''
 
 
 ################################################################################
