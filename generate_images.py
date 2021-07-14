@@ -8,17 +8,24 @@ import aiohttp
 
 from github_stats import Stats
 
+import config as c
+
+# Quick fix for error prevention:
+c.import_path += '/' if c.import_path[-1] != '/' else ''
+c.export_path += '/' if c.export_path[-1] != '/' else ''
+c.enclosing_directory += '/' if c.enclosing_directory[-1] != '/' else ''
+
 
 ################################################################################
 # Helper Functions
 ################################################################################
 
-def generate_output_folder() -> None:
+def generate_output_folder(dirpath = "") -> None:
     """
     Create the output folder if it does not already exist
     """
-    if not os.path.isdir("generated"):
-        os.mkdir("generated")
+    if not os.path.isdir(dirpath + c.enclosing_directory):
+        os.mkdir(dirpath + c.enclosing_directory)
 
 
 ################################################################################
@@ -30,7 +37,7 @@ async def generate_overview(s: Stats) -> None:
     Generate an SVG badge with summary statistics
     :param s: Represents user's GitHub statistics
     """
-    with open("templates/overview.svg", "r") as f:
+    with open(c.import_path + "templates/overview.svg", "r") as f:
         output = f.read()
 
     output = re.sub("{{ name }}", await s.name, output)
@@ -43,8 +50,8 @@ async def generate_overview(s: Stats) -> None:
     output = re.sub("{{ views }}", f"{await s.views:,}", output)
     output = re.sub("{{ repos }}", f"{len(await s.repos):,}", output)
 
-    generate_output_folder()
-    with open("generated/overview.svg", "w") as f:
+    generate_output_folder(c.export_path)
+    with open(c.export_path + c.enclosing_directory + "overview.svg", "w") as f:
         f.write(output)
 
 
@@ -53,7 +60,7 @@ async def generate_languages(s: Stats) -> None:
     Generate an SVG badge with summary languages used
     :param s: Represents user's GitHub statistics
     """
-    with open("templates/languages.svg", "r") as f:
+    with open(c.import_path + "templates/languages.svg", "r") as f:
         output = f.read()
 
     progress = ""
@@ -81,8 +88,8 @@ fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8z"></path></svg>
     output = re.sub(r"{{ progress }}", progress, output)
     output = re.sub(r"{{ lang_list }}", lang_list, output)
 
-    generate_output_folder()
-    with open("generated/languages.svg", "w") as f:
+    generate_output_folder(c.export_path)
+    with open(c.export_path + c.enclosing_directory + "languages.svg", "w") as f:
         f.write(output)
 
 
@@ -99,20 +106,11 @@ async def main() -> None:
         # access_token = os.getenv("GITHUB_TOKEN")
         raise Exception("A personal access token is required to proceed!")
     user = os.getenv("GITHUB_ACTOR")
-    exclude_repos = os.getenv("EXCLUDED")
-    exclude_repos = ({x.strip() for x in exclude_repos.split(",")}
-                     if exclude_repos else None)
-    exclude_langs = os.getenv("EXCLUDED_LANGS")
-    exclude_langs = ({x.strip() for x in exclude_langs.split(",")}
-                     if exclude_langs else None)
-    # Convert a truthy value to a Boolean
-    ignore_forked_repos = os.getenv("EXCLUDE_FORKED_REPOS")
-    ignore_forked_repos = (not not ignore_forked_repos 
-                           and ignore_forked_repos.strip().lower() != "false")
     async with aiohttp.ClientSession() as session:
-        s = Stats(user, access_token, session, exclude_repos=exclude_repos,
-                  exclude_langs=exclude_langs,
-                  ignore_forked_repos=ignore_forked_repos)
+        s = Stats(user, access_token, session,
+                  exclude_repos=set(c.excluded_repositories),
+                  exclude_langs=set(c.excluded_languages),
+                  ignore_forked_repos=c.exclude_forked_repositories)
         await asyncio.gather(generate_languages(s), generate_overview(s))
 
 if __name__ == "__main__":
