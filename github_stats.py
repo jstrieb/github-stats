@@ -73,7 +73,7 @@ class Queries(object):
                 path = path[1:]
             try:
                 async with self.semaphore:
-                    r = await self.session.get(f"https://api.github.com/{path}",
+                    r = await self.session.get(f"https://api.github.com/user/{path}",
                                                headers=headers,
                                                params=tuple(params.items()))
                 if r.status == 202:
@@ -89,7 +89,7 @@ class Queries(object):
                 print("aiohttp failed for rest query")
                 # Fall back on non-async requests
                 async with self.semaphore:
-                    r = requests.get(f"https://api.github.com/{path}",
+                    r = requests.get(f"https://api.github.com/user/{path}",
                                      headers=headers,
                                      params=tuple(params.items()))
                     if r.status_code == 202:
