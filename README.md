@@ -112,21 +112,18 @@ For more information on inaccuracies, see issue
 
 # Support the Project
 
-There are a few ways to support this project.
+There are a few things you can do to support the project:
 
-Most importantly: star this repository and follow me on GitHub. These things
-motivate me to to keep sharing what I build, and they provide validation that
-my work is appreciated. In the same vein, please consider sharing the project
-on platforms like Reddit and Twitter.
+- Star the repository (and follow me on GitHub for more)
+- Share and upvote on sites like Twitter, Reddit, and Hacker News
+- Report any bugs, glitches, or errors that you find
 
-Stars on GitHub also help me gauge who is making use of the project – since I
-do not include tracking or analytics in this or any project, I have no idea how
-many people use what I build unless they deliberately take action to notify me.
-If GitHub is not your style, reach out to me on my [contact
-page](https://jstrieb.github.io/about/#contact) and say "hello" instead! 
+These things motivate me to to keep sharing what I build, and they provide
+validation that my work is appreciated! They also help me improve the
+project. Thanks in advance!
 
 If you are insistent on spending money to show your support, I encourage you to
-make a generous donation to one of the following organizations. By advocating
+instead make a generous donation to one of the following organizations. By advocating
 for Internet freedoms, organizations like these help me to feel comfortable
 releasing work publicly on the Web.
 
