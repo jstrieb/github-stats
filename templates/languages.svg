@@ -94,10 +94,10 @@ div.ellipsis {
   color: rgb(88, 96, 105)
 }
 </style>
-<g transform="translate(5, 5)">
-<rect id="background" />
-<g transform="translate(16, 16)">
-<foreignObject>
+<g>
+<rect x="5" y="5" id="background" />
+<g>
+<foreignObject x="21" y="17" width="318" height="176">
 <div xmlns="http://www.w3.org/1999/xhtml" class="ellipsis">
 
 <h2>Languages</h2>

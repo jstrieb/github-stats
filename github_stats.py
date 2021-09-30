@@ -40,7 +40,9 @@ class Queries(object):
                 r = await self.session.post("https://api.github.com/graphql",
                                             headers=headers,
                                             json={"query": generated_query})
-            return await r.json()
+            result = await r.json()
+            if result is not None:
+                return result
         except:
             print("aiohttp failed for GraphQL query")
             # Fall back on non-async requests
@@ -48,7 +50,10 @@ class Queries(object):
                 r = requests.post("https://api.github.com/graphql",
                                   headers=headers,
                                   json={"query": generated_query})
-                return r.json()
+                result = r.json()
+                if result is not None:
+                    return result
+        return dict()
 
     async def query_rest(self, path: str, params: Optional[Dict] = None) -> Dict:
         """
@@ -113,7 +118,6 @@ class Queries(object):
             field: UPDATED_AT,
             direction: DESC
         }},
-        ownerAffiliations: [OWNER, COLLABORATOR, ORGANIZATION_MEMBER],
         after: {"null" if owned_cursor is None else '"'+ owned_cursor +'"'}
     ) {{
       pageInfo {{
@@ -126,7 +130,43 @@ class Queries(object):
           totalCount
         }}
         forkCount
-        languages(first: 50, orderBy: {{field: SIZE, direction: DESC}}) {{
+        languages(first: 10, orderBy: {{field: SIZE, direction: DESC}}) {{
+          edges {{
+            size
+            node {{
+              name
+              color
+            }}
+          }}
+        }}
+      }}
+    }}
+    repositoriesContributedTo(
+        first: 100,
+        includeUserRepositories: false,
+        orderBy: {{
+            field: UPDATED_AT,
+            direction: DESC
+        }},
+        contributionTypes: [
+            COMMIT,
+            PULL_REQUEST,
+            REPOSITORY,
+            PULL_REQUEST_REVIEW
+        ]
+        after: {"null" if contrib_cursor is None else '"'+ contrib_cursor +'"'}
+    ) {{
+      pageInfo {{
+        hasNextPage
+        endCursor
+      }}
+      nodes {{
+        nameWithOwner
+        stargazers {{
+          totalCount
+        }}
+        forkCount
+        languages(first: 10, orderBy: {{field: SIZE, direction: DESC}}) {{
           edges {{
             size
             node {{
@@ -196,8 +236,10 @@ class Stats(object):
     def __init__(self, username: str, access_token: str,
                  session: aiohttp.ClientSession,
                  exclude_repos: Optional[Set] = None,
-                 exclude_langs: Optional[Set] = None):
+                 exclude_langs: Optional[Set] = None,
+                 ignore_forked_repos: bool = False):
         self.username = username
+        self._ignore_forked_repos = ignore_forked_repos
         self._exclude_repos = set() if exclude_repos is None else exclude_repos
         self._exclude_langs = set() if exclude_langs is None else exclude_langs
         self.queries = Queries(username, access_token, session)
@@ -262,16 +304,20 @@ Languages:
 
             contrib_repos = (raw_results
                              .get("data", {})
-                             .get("viewer", {}))
-
+                             .get("viewer", {})
+                             .get("repositoriesContributedTo", {}))
             owned_repos = (raw_results
                            .get("data", {})
                            .get("viewer", {})
                            .get("repositories", {}))
-            repos = (contrib_repos.get("nodes", [])
-                     + owned_repos.get("nodes", []))
+
+            repos = owned_repos.get("nodes", [])
+            if not self._ignore_forked_repos:
+                repos += contrib_repos.get("nodes", [])
 
             for repo in repos:
+                if repo is None:
+                    continue
                 name = repo.get("nameWithOwner")
                 if name in self._repos or name in self._exclude_repos:
                     continue
