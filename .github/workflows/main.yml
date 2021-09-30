@@ -57,8 +57,8 @@ jobs:
         python3 generate_images.py
       env:
         ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
-        EXCLUDED: 'wopian/github-stats,jstrieb/github-stats,wopian/kitsu-csp,wopian/wopian.moe,wopian/codingame,wopian/wwmcc,wopian/skylark,wopian/whatpulse-stats,jwoods02/Mosaic-Island-Timesheet-System'
-        EXCLUDED_LANGS: 'PHP,Java,HTML,YAML,INI,Assembly'
+        EXCLUDED: 'wopian/github-stats,jstrieb/github-stats,wopian/kitsu-csp,wopian/wopian.moe,wopian/codingame,wopian/wwmcc,wopian/skylark,wopian/whatpulse-stats,jwoods02/Mosaic-Island-Timesheet-System,hummingbird-me/kitsu-server'
+        EXCLUDED_LANGS: 'PHP,Java,HTML,YAML,INI,Assembly,Objective-C,ShaderLab,HLSL,PLpgSQL'
 
     # Commits all changed files to the repository
     - name: Commit to the repo
