@@ -113,7 +113,7 @@ class Queries(object):
             field: UPDATED_AT,
             direction: DESC
         }},
-        isFork: false,
+        isFork: true,
         ownerAffiliations: [OWNER, COLLABORATOR, ORGANIZATION_MEMBER],
         after: {"null" if owned_cursor is None else '"'+ owned_cursor +'"'}
     ) {{
@@ -223,7 +223,7 @@ class Stats(object):
         lines_changed = await self.lines_changed
         return f"""Name: {await self.name}
 Stargazers: {await self.stargazers:,}
-Forks: {await self.forks:,}
+Forked by: {await self.forks:,}
 All-time contributions: {await self.total_contributions:,}
 Repositories with contributions: {len(await self.repos)}
 Lines of code added: {lines_changed[0]:,}
