@@ -2,7 +2,7 @@
 
 import asyncio
 import os
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple, Any, cast
 
 import aiohttp
 import requests
@@ -43,24 +43,24 @@ class Queries(object):
         }
         try:
             async with self.semaphore:
-                r = await self.session.post(
+                r_async = await self.session.post(
                     "https://api.github.com/graphql",
                     headers=headers,
                     json={"query": generated_query},
                 )
-            result = await r.json()
+            result = await r_async.json()
             if result is not None:
                 return result
         except:
             print("aiohttp failed for GraphQL query")
             # Fall back on non-async requests
             async with self.semaphore:
-                r = requests.post(
+                r_requests = requests.post(
                     "https://api.github.com/graphql",
                     headers=headers,
                     json={"query": generated_query},
                 )
-                result = r.json()
+                result = r_requests.json()
                 if result is not None:
                     return result
         return dict()
@@ -83,35 +83,35 @@ class Queries(object):
                 path = path[1:]
             try:
                 async with self.semaphore:
-                    r = await self.session.get(
+                    r_async = await self.session.get(
                         f"https://api.github.com/{path}",
                         headers=headers,
                         params=tuple(params.items()),
                     )
-                if r.status == 202:
+                if r_async.status == 202:
                     # print(f"{path} returned 202. Retrying...")
                     print(f"A path returned 202. Retrying...")
                     await asyncio.sleep(2)
                     continue
 
-                result = await r.json()
+                result = await r_async.json()
                 if result is not None:
                     return result
             except:
                 print("aiohttp failed for rest query")
                 # Fall back on non-async requests
                 async with self.semaphore:
-                    r = requests.get(
+                    r_requests = requests.get(
                         f"https://api.github.com/{path}",
                         headers=headers,
                         params=tuple(params.items()),
                     )
-                    if r.status_code == 202:
+                    if r_requests.status_code == 202:
                         print(f"A path returned 202. Retrying...")
                         await asyncio.sleep(2)
                         continue
-                    elif r.status_code == 200:
-                        return r.json()
+                    elif r_requests.status_code == 200:
+                        return r_requests.json()
         # print(f"There were too many 202s. Data for {path} will be incomplete.")
         print("There were too many 202s. Data for this repository will be incomplete.")
         return dict()
@@ -265,14 +265,14 @@ class Stats(object):
         self._exclude_langs = set() if exclude_langs is None else exclude_langs
         self.queries = Queries(username, access_token, session)
 
-        self._name = None
-        self._stargazers = None
-        self._forks = None
-        self._total_contributions = None
-        self._languages = None
-        self._repos = None
-        self._lines_changed = None
-        self._views = None
+        self._name: Optional[str] = None
+        self._stargazers: Optional[int] = None
+        self._forks: Optional[int] = None
+        self._total_contributions: Optional[int] = None
+        self._languages: Optional[Dict[str, Any]] = None
+        self._repos: Optional[Set[str]] = None
+        self._lines_changed: Optional[Tuple[int, int]] = None
+        self._views: Optional[int] = None
 
     async def to_str(self) -> str:
         """
@@ -434,7 +434,7 @@ Languages:
         return {k: v.get("prop", 0) for (k, v) in self._languages.items()}
 
     @property
-    async def repos(self) -> List[str]:
+    async def repos(self) -> Set[str]:
         """
         :return: list of names of user's repos
         """
@@ -470,7 +470,7 @@ Languages:
             self._total_contributions += year.get("contributionCalendar", {}).get(
                 "totalContributions", 0
             )
-        return self._total_contributions
+        return cast(int, self._total_contributions)
 
     @property
     async def lines_changed(self) -> Tuple[int, int]:
@@ -530,6 +530,10 @@ async def main() -> None:
     """
     access_token = os.getenv("ACCESS_TOKEN")
     user = os.getenv("GITHUB_ACTOR")
+    if access_token is None or user is None:
+        raise RuntimeError(
+            "ACCESS_TOKEN and GITHUB_ACTOR environment variables cannot be None!"
+        )
     async with aiohttp.ClientSession() as session:
         s = Stats(user, access_token, session)
         print(await s.to_str())

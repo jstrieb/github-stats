@@ -104,26 +104,29 @@ async def main() -> None:
         # access_token = os.getenv("GITHUB_TOKEN")
         raise Exception("A personal access token is required to proceed!")
     user = os.getenv("GITHUB_ACTOR")
+    if user is None:
+        raise RuntimeError("Environment variable GITHUB_ACTOR must be set.")
     exclude_repos = os.getenv("EXCLUDED")
-    exclude_repos = (
+    excluded_repos = (
         {x.strip() for x in exclude_repos.split(",")} if exclude_repos else None
     )
     exclude_langs = os.getenv("EXCLUDED_LANGS")
-    exclude_langs = (
+    excluded_langs = (
         {x.strip() for x in exclude_langs.split(",")} if exclude_langs else None
     )
     # Convert a truthy value to a Boolean
-    ignore_forked_repos = os.getenv("EXCLUDE_FORKED_REPOS")
+    raw_ignore_forked_repos = os.getenv("EXCLUDE_FORKED_REPOS")
     ignore_forked_repos = (
-        not not ignore_forked_repos and ignore_forked_repos.strip().lower() != "false"
+        not not raw_ignore_forked_repos
+        and raw_ignore_forked_repos.strip().lower() != "false"
     )
     async with aiohttp.ClientSession() as session:
         s = Stats(
             user,
             access_token,
             session,
-            exclude_repos=exclude_repos,
-            exclude_langs=exclude_langs,
+            exclude_repos=excluded_repos,
+            exclude_langs=excluded_langs,
             ignore_forked_repos=ignore_forked_repos,
         )
         await asyncio.gather(generate_languages(s), generate_overview(s))
