@@ -1,5 +1,14 @@
-<svg width="360" height="210" xmlns="http://www.w3.org/2000/svg">
+<svg id="card-overview" width="360" height="210" xmlns="http://www.w3.org/2000/svg">
 <style>
+#card-overview {
+  --card-width: 360px;
+  --card-height: 210px;
+  --background-width: calc(var(--card-width) - 10px);
+  --background-height: calc(var(--card-height) - 10px);
+    --foreign-object-width: calc(var(--card-width) - 42px);
+  --foreign-object-height: calc(var(--card-height) - 42px);
+}
+
 svg {
   font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif, Apple Color Emoji, Segoe UI Emoji;
   font-size: 14px;
@@ -7,8 +16,8 @@ svg {
 }
 
 #background {
-  width: calc(100% - 10px);
-  height: calc(100% - 10px);
+  width: var(--background-width);
+  height: var(--background-height);
   fill: white;
   stroke: rgb(225, 228, 232);
   stroke-width: 1px;
@@ -17,12 +26,12 @@ svg {
 }
 
 foreignObject {
-  width: calc(100% - 10px - 32px);
-  height: calc(100% - 10px - 32px);
+  width: var(--foreign-object-width);
+  height: var(--foreign-object-height);
 }
 
 table {
-  width: 100%;
+  width: var(--width);
   border-collapse: collapse;
   table-layout: auto;
 }
