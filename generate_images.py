@@ -3,6 +3,7 @@
 import asyncio
 import os
 import re
+from functools import reduce
 
 import aiohttp
 
@@ -62,13 +63,17 @@ async def generate_languages(s: Stats) -> None:
     sorted_languages = sorted(
         (await s.languages).items(), reverse=True, key=lambda t: t[1].get("size")
     )
+    # only show the top 10 languages
+    top10_languages = sorted_languages[:10]
+    percent_scale = 100 / reduce(lambda acc,cur: acc + cur[1].get("prop"), top10_languages, 0)
     delay_between = 150
-    for i, (lang, data) in enumerate(sorted_languages):
+    for i, (lang, data) in enumerate(top10_languages):
         color = data.get("color")
         color = color if color is not None else "#000000"
+        percentage = data.get("prop", 0) * percent_scale
         progress += (
             f'<span style="background-color: {color};'
-            f'width: {data.get("prop", 0):0.3f}%;" '
+            f'width: {percentage:0.3f}%;" '
             f'class="progress-item"></span>'
         )
         lang_list += f"""
@@ -77,9 +82,8 @@ async def generate_languages(s: Stats) -> None:
 viewBox="0 0 16 16" version="1.1" width="16" height="16"><path
 fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8z"></path></svg>
 <span class="lang">{lang}</span>
-<span class="percent">{data.get("prop", 0):0.2f}%</span>
+<span class="percent">{percentage:0.2f}%</span>
 </li>
-
 """
 
     output = re.sub(r"{{ progress }}", progress, output)
