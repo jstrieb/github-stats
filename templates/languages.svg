@@ -41,6 +41,9 @@ h2 {
 }
 
 ul {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  flex: 1;
   list-style: none;
   padding-left: 0;
   margin-top: 0;
@@ -67,6 +70,8 @@ li {
 }
 
 div.ellipsis {
+  display: flex;
+  flex-flow: column;
   height: var(--foreign-object-height);
   overflow: hidden;
   text-overflow: ellipsis;
