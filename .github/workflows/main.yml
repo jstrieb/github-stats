@@ -58,7 +58,7 @@ jobs:
       env:
         ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
         EXCLUDED: 'wopian/github-stats,jstrieb/github-stats,wopian/kitsu-csp,wopian/wopian.moe,wopian/codingame,wopian/wwmcc,wopian/skylark,wopian/whatpulse-stats,jwoods02/Mosaic-Island-Timesheet-System,wopian/bucks-new-university,wopian/random-number-game,hummingbird-me/kitsu-tools,hummingbird-me/kitsu-server,alexcosta97/mac-setup,hussein181/C0699PropertyProject,alexcosta97/web-apps-project,jwoods02/game.jwoods.me,tonsky/FiraCode,JanDeDobbeleeer/oh-my-posh,otakulogy/anime-streaming,GoogleChrome/workbox,visionmedia/superagent,apideck-libraries/better-ajv-errors'
-        EXCLUDED_LANGS: 'PHP,Java,HTML,YAML,INI,Assembly,Objective-C,ShaderLab,HLSL,PLpgSQL,Ruby,TeX,Shell,C#,Handlebars,SCSS,CSS,Pug,Stylus,Perl,Haml,Dockerfile,Sass,Python,Text,Go,Nunjucks,Makefile,Clojure,PowerShell'
+        EXCLUDED_LANGS: 'PHP,Java,HTML,YAML,INI,Assembly,Objective-C,ShaderLab,HLSL,PLpgSQL,Ruby,TeX,Shell,C#,Handlebars,Pug,Perl,Haml,Dockerfile,Python,Text,Go,Nunjucks,Makefile,Clojure,PowerShell,Inno Setup'
         EXCLUDE_FORKED_REPOS: false
 
     # Commits all changed files to the repository
