@@ -58,7 +58,7 @@ jobs:
       env:
         ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
         EXCLUDED: 'wopian/github-stats,jstrieb/github-stats,wopian/kitsu-csp,wopian/wopian.moe,wopian/codingame,wopian/wwmcc,wopian/skylark,wopian/whatpulse-stats,jwoods02/Mosaic-Island-Timesheet-System,wopian/bucks-new-university,wopian/random-number-game'
-        EXCLUDED_LANGS: 'PHP,Java,HTML,YAML,INI,Assembly,Objective-C,ShaderLab,HLSL,PLpgSQL,Ruby,TeX,Shell,C#,Handlebars,SCSS,CSS,Pug,Stylus,Perl,Haml,Dockerfile,Sass,Python,'
+        EXCLUDED_LANGS: 'PHP,Java,HTML,YAML,INI,Assembly,Objective-C,ShaderLab,HLSL,PLpgSQL,Ruby,TeX,Shell,C#,Handlebars,SCSS,CSS,Pug,Stylus,Perl,Haml,Dockerfile,Sass,Python,Text'
         EXCLUDE_FORKED_REPOS: true
 
     # Commits all changed files to the repository
