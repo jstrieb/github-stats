@@ -313,7 +313,7 @@ Languages:
                            .get("repositories", {}))
 
             repos = owned_repos.get("nodes", [])
-            print(repos)
+
             if not self._ignore_forked_repos:
                 repos += contrib_repos.get("nodes", [])
 
