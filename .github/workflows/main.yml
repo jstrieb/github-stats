@@ -24,10 +24,10 @@ jobs:
     - uses: actions/checkout@v2
 
     # Run using Python 3.8 for consistency and aiohttp
-    - name: Set up Python 3.8
+    - name: Set up Python 3.10
       uses: actions/setup-python@v2
       with:
-        python-version: '3.8'
+        python-version: '3.10'
         architecture: 'x64'
 
     # Cache dependencies. From:
@@ -49,13 +49,22 @@ jobs:
     - name: Generate images
       run: |
         python3 --version
-        python3 generate_images.py
+        python3 git_stats_imgs.py
       env:
         ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         EXCLUDED: ${{ secrets.EXCLUDED }}
         EXCLUDED_LANGS: ${{ secrets.EXCLUDED_LANGS }}
-        EXCLUDE_FORKED_REPOS: true
+        EXCLUDE_FORKED_REPOS: ${{ secrets.EXCLUDE_FORKED_REPOS }}
+        REPO_VIEWS: ${{ secrets.REPO_VIEWS }}
+        LAST_VIEWED: ${{ secrets.LAST_VIEWED }}
+        FIRST_VIEWED: ${{ secrets.LAST_VIEWED }}
+        MAINTAIN_REPO_VIEWS: ${{ secrets.MAINTAIN_REPO_VIEWS }}
+        REPO_CLONES: ${{ secrets.REPO_CLONES }}
+        LAST_CLONED: ${{ secrets.LAST_CLONED }}
+        FIRST_CLONED: ${{ secrets.LAST_CLONED }}
+        MAINTAIN_REPO_CLONES: ${{ secrets.MAINTAIN_REPO_CLONES }}
+        MORE_COLLABS: ${{ secrets.MORE_COLLABS }}
 
     # Commits all changed files to the repository
     - name: Commit to the repo
