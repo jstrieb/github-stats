@@ -2,8 +2,8 @@
 
 <a href="https://github.com/jstrieb/github-stats">
 
-![](https://github.com/jstrieb/github-stats/blob/master/generated/overview.svg)
-![](https://github.com/jstrieb/github-stats/blob/master/generated/languages.svg)
+![](https://raw.githubusercontent.com/jstrieb/github-stats/master/generated_images/overview.svg)
+![](https://raw.githubusercontent.com/jstrieb/github-stats/master/generated_images/languages.svg)
 
 </a>
 
@@ -100,10 +100,10 @@ For more information on inaccuracies, see issue
    lines of code into your markdown content. Change the `username` value to your GitHub 
    username.
    ```md
-   ![](https://github.com/username/github-stats/blob/master/generated/overview.svg)
+   ![](https://raw.githubusercontent.com/<username>/github-stats/master/generated_images/overview.svg)
    ```
    ```md
-   ![](https://github.com/username/github-stats/blob/master/generated/languages.svg)
+   ![](https://raw.githubusercontent.com/<username>/github-stats/master/generated_images/languages.svg)
    ```
 9. Link back to this repository so that others can generate their own
    statistics images.

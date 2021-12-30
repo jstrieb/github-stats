@@ -1,0 +1,529 @@
+#!/usr/bin/python3
+
+from typing import Dict, Optional, Set, Tuple, Any, cast
+from aiohttp import ClientSession
+from datetime import date
+
+from src.environ_vars import EnvironmentVariables
+from src.github_api_queries import GitHubApiQueries
+
+
+class GitHubRepoStats(object):
+    """
+    Retrieve and store statistics about GitHub usage.
+    """
+
+    def __init__(self,
+                 environment_vars: EnvironmentVariables,
+                 session: ClientSession):
+        self.environment_vars: EnvironmentVariables = environment_vars
+        self.queries = GitHubApiQueries(self.environment_vars.username,
+                                        self.environment_vars.access_token,
+                                        session)
+
+        self._name: Optional[str] = None
+        self._stargazers: Optional[int] = None
+        self._forks: Optional[int] = None
+        self._total_contributions: Optional[int] = None
+        self._languages: Optional[Dict[str, Any]] = None
+        self._repos: Optional[Set[str]] = None
+        self._empty_repos: Optional[Set[str]] = None
+        self._users_lines_changed: Optional[Tuple[int, int]] = None
+        self._total_lines_changed: Optional[Tuple[int, int]] = None
+        self._contributions_percentage: Optional[str] = None
+        self._views: Optional[int] = None
+        self._clones: Optional[int] = None
+        self._collaborators: Optional[int] = None
+        self._contributors: Optional[Set[str]] = None
+        self._views_from_date: Optional[str] = None
+        self._clones_from_date: Optional[str] = None
+        self._pull_requests: Optional[int] = None
+        self._issues: Optional[int] = None
+
+    async def to_str(self) -> str:
+        """
+        :return: summary of all available statistics
+        """
+        languages = await self.languages_proportional
+        formatted_languages = "\n\t\t\t- ".join(
+            [f"{k}: {v:0.4f}%" for k, v in languages.items()]
+        )
+
+        users_lines_changed = await self.lines_changed
+        total_lines_changed = self._total_lines_changed
+
+        if users_lines_changed[0] > 0:
+            prcnt_added = users_lines_changed[0] / total_lines_changed[0] * 100
+        else:
+            prcnt_added = 0.0
+
+        if users_lines_changed[1] > 0:
+            prcnt_dltd = users_lines_changed[1] / total_lines_changed[1] * 100
+        else:
+            prcnt_dltd = 0.0
+        ttl_prcnt = await self.contributions_percentage
+
+        return f"""GitHub Repository Statistics:
+        Stargazers: {await self.stargazers:,}
+        Forks: {await self.forks:,}
+        Pull requests: {await self.pull_requests:,}
+        Issues: {await self.issues:,}
+        All-time contributions: {await self.total_contributions:,}
+        Repositories with contributions: {len(await self.repos) - 
+                                          len(await self.empty_repos):,}
+        Lines of code added: {users_lines_changed[0]:,}
+        Lines of code deleted: {users_lines_changed[1]:,}
+        Lines of code changed: {sum(users_lines_changed):,}
+        Percentage of total code line additions: {prcnt_added:0.2f}%
+        Percentage of total code line deletions: {prcnt_dltd:0.2f}%
+        Percentage of code change contributions: {float(ttl_prcnt[:-1]):0.2f}%
+        Project page views: {await self.views:,}
+        Project page views from date: {await self.views_from_date}
+        Project repository clones: {await self.clones:,}
+        Project repository clones from date: {await self.clones_from_date}
+        Project repository collaborators: {await self.collaborators:,}
+        Project repository contributors: {len(await self.contributors) - 1:,}
+        Languages:\n\t\t\t- {formatted_languages}"""
+
+    async def get_stats(self) -> None:
+        """
+        Get lots of summary stats using one big query. Sets many attributes
+        """
+        self._stargazers = 0
+        self._forks = 0
+        self._languages = dict()
+        self._repos = set()
+        self._empty_repos = set()
+
+        next_owned = None
+        next_contrib = None
+
+        while True:
+            raw_results = await self.queries.query(
+                GitHubApiQueries.repos_overview(owned_cursor=next_owned,
+                                                contrib_cursor=next_contrib)
+            )
+            raw_results = raw_results if raw_results is not None else {}
+
+            self._name = raw_results\
+                .get("data", {})\
+                .get("viewer", {})\
+                .get("name", None)
+
+            if self._name is None:
+                self._name = (raw_results.get("data", {})
+                              .get("viewer", {})
+                              .get("login", "No Name"))
+
+            contrib_repos = (raw_results.get("data", {})
+                             .get("viewer", {})
+                             .get("repositoriesContributedTo", {}))
+
+            owned_repos = (raw_results
+                           .get("data", {})
+                           .get("viewer", {})
+                           .get("repositories", {}))
+
+            repos = owned_repos.get("nodes", [])
+            if not self.environment_vars.ignore_forked_repos:
+                repos += contrib_repos.get("nodes", [])
+
+            for repo in repos:
+                if repo is None:
+                    continue
+
+                name = repo.get("nameWithOwner")
+                if name in self._repos or name in self.environment_vars.exclude_repos:
+                    continue
+                self._repos.add(name)
+
+                if len(repo.get("languages").get("edges")) == 0:
+                    self._empty_repos.add(name)
+
+                self._stargazers += repo.get("stargazers").get("totalCount", 0)
+                self._forks += repo.get("forkCount", 0)
+
+                for lang in repo.get("languages", {}).get("edges", []):
+                    name = lang.get("node", {}).get("name", "Other")
+                    languages = await self.languages
+
+                    if name in self.environment_vars.exclude_langs:
+                        continue
+
+                    if name in languages:
+                        languages[name]["size"] += lang.get("size", 0)
+                        languages[name]["occurrences"] += 1
+                    else:
+                        languages[name] = {
+                            "size": lang.get("size", 0),
+                            "occurrences": 1,
+                            "color": lang.get("node", {}).get("color"),
+                        }
+
+            is_cur_owned = owned_repos\
+                .get("pageInfo", {})\
+                .get("hasNextPage", False)
+            is_cur_contrib = contrib_repos\
+                .get("pageInfo", {})\
+                .get("hasNextPage", False)
+
+            if is_cur_owned or is_cur_contrib:
+                next_owned = owned_repos\
+                    .get("pageInfo", {})\
+                    .get("endCursor", next_owned)
+                next_contrib = contrib_repos\
+                    .get("pageInfo", {})\
+                    .get("endCursor", next_contrib)
+            else:
+                break
+
+        # TODO: Improve languages to scale by number of contributions to
+        #       specific filetypes
+        langs_total = sum([v.get("size", 0) for v in self._languages.values()])
+        for k, v in self._languages.items():
+            v["prop"] = 100 * (v.get("size", 0) / langs_total)
+
+    @property
+    async def name(self) -> str:
+        """
+        :return: GitHub user's name
+        """
+        if self._name is not None:
+            return self._name
+        await self.get_stats()
+        assert self._name is not None
+        return self._name
+
+    @property
+    async def stargazers(self) -> int:
+        """
+        :return: total number of stargazers on user's repos
+        """
+        if self._stargazers is not None:
+            return self._stargazers
+        await self.get_stats()
+        assert self._stargazers is not None
+        return self._stargazers
+
+    @property
+    async def forks(self) -> int:
+        """
+        :return: total number of forks on user's repos
+        """
+        if self._forks is not None:
+            return self._forks
+        await self.get_stats()
+        assert self._forks is not None
+        return self._forks
+
+    @property
+    async def languages(self) -> Dict:
+        """
+        :return: summary of languages used by the user
+        """
+        if self._languages is not None:
+            return self._languages
+        await self.get_stats()
+        assert self._languages is not None
+        return self._languages
+
+    @property
+    async def languages_proportional(self) -> Dict:
+        """
+        :return: summary of languages used by the user, with proportional usage
+        """
+        if self._languages is None:
+            await self.get_stats()
+            assert self._languages is not None
+        return {k: v.get("prop", 0) for (k, v) in self._languages.items()}
+
+    @property
+    async def repos(self) -> Set[str]:
+        """
+        :return: list of names of user's repos
+        """
+        if self._repos is not None:
+            return self._repos
+        await self.get_stats()
+        assert self._repos is not None
+        return self._repos
+
+    @property
+    async def empty_repos(self) -> Set[str]:
+        """
+        :return: list of names of user's repos that are empty
+        """
+        if self._empty_repos is not None:
+            return self._empty_repos
+        await self.get_stats()
+        assert self._empty_repos is not None
+        return self._empty_repos
+
+    @property
+    async def total_contributions(self) -> int:
+        """
+        :return: count of user's total contributions as defined by GitHub
+        """
+        if self._total_contributions is not None:
+            return self._total_contributions
+        self._total_contributions = 0
+
+        years = ((await self.queries.query(GitHubApiQueries
+                                           .contributions_all_years()))
+                 .get("data", {})
+                 .get("viewer", {})
+                 .get("contributionsCollection", {})
+                 .get("contributionYears", []))
+
+        by_year = ((await self.queries.query(GitHubApiQueries
+                                             .all_contributions(years)))
+                   .get("data", {})
+                   .get("viewer", {})
+                   .values())
+
+        for year in by_year:
+            self._total_contributions += year\
+                .get("contributionCalendar", {})\
+                .get("totalContributions", 0)
+        return cast(int, self._total_contributions)
+
+    @property
+    async def lines_changed(self) -> Tuple[int, int]:
+        """
+        :return: count of total lines added, removed, or modified by the user
+        """
+        if self._users_lines_changed is not None:
+            return self._users_lines_changed
+        total_additions = 0
+        total_deletions = 0
+        additions = 0
+        deletions = 0
+
+        for repo in await self.repos:
+            if repo not in self._empty_repos:
+                r = await self.queries\
+                    .query_rest(f"/repos/{repo}/stats/contributors")
+
+                for author_obj in r:
+                    # Handle malformed response from API by skipping this repo
+                    if not isinstance(author_obj, dict) or not isinstance(
+                            author_obj.get("author", {}), dict
+                    ):
+                        continue
+                    author = author_obj.get("author", {}).get("login", "")
+
+                    if author != self.environment_vars.username:
+                        for week in author_obj.get("weeks", []):
+                            total_additions += week.get("a", 0)
+                            total_deletions += week.get("d", 0)
+                    else:
+                        for week in author_obj.get("weeks", []):
+                            additions += week.get("a", 0)
+                            deletions += week.get("d", 0)
+
+        total_additions += additions
+        total_deletions += deletions
+        self._users_lines_changed = (additions, deletions)
+        self._total_lines_changed = (total_additions, total_deletions)
+
+        if sum(self._users_lines_changed) > 0:
+            ttl_changes = sum(self._total_lines_changed)
+            user_changes = sum(self._users_lines_changed)
+            percent_contribs = user_changes / ttl_changes * 100
+        else:
+            percent_contribs = 0.0
+        self._contributions_percentage = f"{percent_contribs:0.2f}%"
+
+        return self._users_lines_changed
+
+    @property
+    async def contributions_percentage(self) -> str:
+        """
+        :return: str representing the percentage of user's repo contributions
+        """
+        if self._contributions_percentage is not None:
+            return self._contributions_percentage
+        await self.lines_changed
+        assert self._contributions_percentage is not None
+        return self._contributions_percentage
+
+    @property
+    async def views(self) -> int:
+        """
+        Note: API returns a user's repository view data for the last 14 days.
+        This counts views as of the initial date this code is first run in repo
+        :return: view count of user's repositories as of a given (first) date
+        """
+        if self._views is not None:
+            return self._views
+
+        last_viewed = self.environment_vars.repo_last_viewed
+        dates, today = [last_viewed], date.today().strftime('%Y-%m-%d')
+
+        today_view_count = 0
+        for repo in await self.repos:
+            r = await self.queries.query_rest(f"/repos/{repo}/traffic/views")
+
+            for view in r.get("views", []):
+                if view.get("timestamp")[:10] == today:
+                    today_view_count += view.get("count", 0)
+                elif view.get("timestamp")[:10] > last_viewed:
+                    self.environment_vars.set_views(view.get("count", 0))
+                    dates.append(view.get("timestamp")[:10])
+
+        if self.environment_vars.maintain_repo_view_count:
+            self.environment_vars.set_last_viewed(max(dates))
+            self.environment_vars.set_views(today_view_count)
+
+            if self.environment_vars.repo_first_viewed == "0000-00-00":
+                self.environment_vars.set_first_viewed(min(dates[1:]))
+            self._views_from_date = self.environment_vars.repo_first_viewed
+        else:
+            self._views_from_date = min(dates)
+
+        self._views = self.environment_vars.repo_views
+        return self._views
+
+    @property
+    async def views_from_date(self) -> str:
+        """
+        :return: the first date included in the repo view count
+        """
+        if self._views_from_date is not None:
+            return self._views_from_date
+        await self.views
+        assert self._views_from_date is not None
+        return self._views_from_date
+
+    @property
+    async def clones(self) -> int:
+        """
+        Note: API returns a user's repository clone data for the last 14 days.
+        This counts clones as of the initial date the code is first run in repo
+        :return: clone count of user's repositories as of a given (first) date
+        """
+        if self._clones is not None:
+            return self._clones
+
+        last_cloned = self.environment_vars.repo_last_cloned
+        dates, today = [last_cloned], date.today().strftime('%Y-%m-%d')
+
+        today_clone_count = 0
+        for repo in await self.repos:
+            r = await self.queries.query_rest(f"/repos/{repo}/traffic/clones")
+
+            for clone in r.get("clones", []):
+                if clone.get("timestamp")[:10] == today:
+                    today_clone_count += clone.get("count", 0)
+                elif clone.get("timestamp")[:10] > last_cloned:
+                    self.environment_vars.set_clones(clone.get("count", 0))
+                    dates.append(clone.get("timestamp")[:10])
+
+        if self.environment_vars.maintain_repo_clone_count:
+            self.environment_vars.set_last_cloned(max(dates))
+            self.environment_vars.set_clones(today_clone_count)
+
+            if self.environment_vars.repo_first_cloned == "0000-00-00":
+                self.environment_vars.set_first_cloned(min(dates[1:]))
+            self._clones_from_date = self.environment_vars.repo_first_cloned
+        else:
+            self._clones_from_date = min(dates)
+
+        self._clones = self.environment_vars.repo_clones
+        return self._clones
+
+    @property
+    async def clones_from_date(self) -> str:
+        """
+        :return: the first date included in the repo clone count
+        """
+        if self._clones_from_date is not None:
+            return self._clones_from_date
+        await self.clones
+        assert self._clones_from_date is not None
+        return self._clones_from_date
+
+    @property
+    async def collaborators(self) -> int:
+        """
+        :return: count of total collaborators to user's repositories
+        """
+        if self._collaborators is not None:
+            return self._collaborators
+
+        collaborator_set = set()
+
+        for repo in await self.repos:
+            if repo not in self._empty_repos:
+                r = await self.queries\
+                    .query_rest(f"/repos/{repo}/collaborators")
+
+                for obj in r:
+                    if isinstance(obj, dict):
+                        collaborator_set.add(obj.get("login"))
+
+        collabs = len(collaborator_set.union(await self.contributors)) - 1
+        self._collaborators = collabs + self.environment_vars.more_collabs
+        return self._collaborators
+
+    @property
+    async def contributors(self) -> Set:
+        """
+        :return: count of total contributors to user's repositories
+        """
+        if self._contributors is not None:
+            return self._contributors
+
+        contributor_set = set()
+
+        for repo in await self.repos:
+            if repo not in self._empty_repos:
+                r = await self.queries\
+                    .query_rest(f"/repos/{repo}/contributors")
+
+                for obj in r:
+                    if isinstance(obj, dict):
+                        contributor_set.add(obj.get("login"))
+
+        self._contributors = contributor_set
+        return contributor_set
+
+    @property
+    async def pull_requests(self) -> int:
+        """
+        :return: count of pull requests in repositories
+        """
+        if self._pull_requests is not None:
+            return self._pull_requests
+
+        self._pull_requests = 0
+
+        for repo in await self.repos:
+            if repo not in self._empty_repos:
+                r = await self.queries\
+                    .query_rest(f"/repos/{repo}/pulls?state=all")
+
+                for obj in r:
+                    if isinstance(obj, dict):
+                        self._pull_requests += 1
+        return self._pull_requests
+
+    @property
+    async def issues(self) -> int:
+        """
+        :return: count of issues in repositories
+        """
+        if self._issues is not None:
+            return self._issues
+
+        self._issues = 0
+
+        for repo in await self.repos:
+            if repo not in self._empty_repos:
+                r = await self.queries \
+                    .query_rest(f"/repos/{repo}/issues?state=all")
+
+                for obj in r:
+                    if isinstance(obj, dict):
+                        self._issues += 1
+        return self._issues
