@@ -1,11 +1,6 @@
 # [GitHub Stats Visualization](https://github.com/jstrieb/github-stats)
 
-<a href="https://github.com/jstrieb/github-stats">
-
-![](https://github.com/jstrieb/github-stats/blob/master/generated/overview.svg)
-![](https://github.com/jstrieb/github-stats/blob/master/generated/languages.svg)
-
-</a>
+![GitStats Overview - Light](https://raw.githubusercontent.com/R055A/GitStats/actions_branch/generated_images/overviewLightMode.svg#gh-light-mode-only)![GitStats Overview - Dark](https://raw.githubusercontent.com/R055A/GitStats/actions_branch/generated_images/overviewDarkMode.svg#gh-dark-mode-only)![GitStats Languages - Light](https://raw.githubusercontent.com/R055A/GitStats/actions_branch/generated_images/languagesLightMode.svg#gh-light-mode-only)![GitStats Languages - Dark](https://raw.githubusercontent.com/R055A/GitStats/actions_branch/generated_images/languagesDarkMode.svg#gh-dark-mode-only)
 
 Generate visualizations of GitHub user and repository statistics using GitHub
 Actions.
@@ -100,10 +95,10 @@ For more information on inaccuracies, see issue
    lines of code into your markdown content. Change the `username` value to your GitHub 
    username.
    ```md
-   ![](https://github.com/username/github-stats/blob/master/generated/overview.svg)
+   ![](https://raw.githubusercontent.com/<username>/github-stats/actions_branch/generated_images/overviewLightMode.svg#gh-light-mode-only)![](https://raw.githubusercontent.com/<username>/github-stats/actions_branch/generated_images/overviewDarkMode.svg#gh-dark-mode-only)
    ```
    ```md
-   ![](https://github.com/username/github-stats/blob/master/generated/languages.svg)
+   ![](https://raw.githubusercontent.com/<username>/github-stats/actions_branch/generated_images/languagesLightMode.svg#gh-light-mode-only)![](https://raw.githubusercontent.com/<username>/github-stats/actions_branch/generated_images/languagesDarkMode.svg#gh-dark-mode-only)
    ```
 9. Link back to this repository so that others can generate their own
    statistics images.
