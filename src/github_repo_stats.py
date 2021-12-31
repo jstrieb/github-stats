@@ -2,7 +2,7 @@
 
 from typing import Dict, Optional, Set, Tuple, Any, cast
 from aiohttp import ClientSession
-from datetime import date
+from datetime import date, timedelta
 
 from src.environ_vars import EnvironmentVariables
 from src.github_api_queries import GitHubApiQueries
@@ -27,7 +27,6 @@ class GitHubRepoStats(object):
         self._total_contributions: Optional[int] = None
         self._languages: Optional[Dict[str, Any]] = None
         self._repos: Optional[Set[str]] = None
-        self._empty_repos: Optional[Set[str]] = None
         self._users_lines_changed: Optional[Tuple[int, int]] = None
         self._total_lines_changed: Optional[Tuple[int, int]] = None
         self._contributions_percentage: Optional[str] = None
@@ -69,8 +68,7 @@ class GitHubRepoStats(object):
         Pull requests: {await self.pull_requests:,}
         Issues: {await self.issues:,}
         All-time contributions: {await self.total_contributions:,}
-        Repositories with contributions: {len(await self.repos) - 
-                                          len(await self.empty_repos):,}
+        Repositories with contributions: {len(await self.repos):,}
         Lines of code added: {users_lines_changed[0]:,}
         Lines of code deleted: {users_lines_changed[1]:,}
         Lines of code changed: {sum(users_lines_changed):,}
@@ -93,7 +91,6 @@ class GitHubRepoStats(object):
         self._forks = 0
         self._languages = dict()
         self._repos = set()
-        self._empty_repos = set()
 
         next_owned = None
         next_contrib = None
@@ -129,16 +126,14 @@ class GitHubRepoStats(object):
                 repos += contrib_repos.get("nodes", [])
 
             for repo in repos:
-                if repo is None:
+                if not repo or len(repo.get("languages").get("edges")) == 0:
                     continue
 
                 name = repo.get("nameWithOwner")
-                if name in self._repos or name in self.environment_vars.exclude_repos:
+                if name in self._repos or \
+                        name in self.environment_vars.exclude_repos:
                     continue
                 self._repos.add(name)
-
-                if len(repo.get("languages").get("edges")) == 0:
-                    self._empty_repos.add(name)
 
                 self._stargazers += repo.get("stargazers").get("totalCount", 0)
                 self._forks += repo.get("forkCount", 0)
@@ -249,17 +244,6 @@ class GitHubRepoStats(object):
         return self._repos
 
     @property
-    async def empty_repos(self) -> Set[str]:
-        """
-        :return: list of names of user's repos that are empty
-        """
-        if self._empty_repos is not None:
-            return self._empty_repos
-        await self.get_stats()
-        assert self._empty_repos is not None
-        return self._empty_repos
-
-    @property
     async def total_contributions(self) -> int:
         """
         :return: count of user's total contributions as defined by GitHub
@@ -300,26 +284,25 @@ class GitHubRepoStats(object):
         deletions = 0
 
         for repo in await self.repos:
-            if repo not in self._empty_repos:
-                r = await self.queries\
-                    .query_rest(f"/repos/{repo}/stats/contributors")
+            r = await self.queries\
+                .query_rest(f"/repos/{repo}/stats/contributors")
 
-                for author_obj in r:
-                    # Handle malformed response from API by skipping this repo
-                    if not isinstance(author_obj, dict) or not isinstance(
-                            author_obj.get("author", {}), dict
-                    ):
-                        continue
-                    author = author_obj.get("author", {}).get("login", "")
+            for author_obj in r:
+                # Handle malformed response from API by skipping this repo
+                if not isinstance(author_obj, dict) or not isinstance(
+                        author_obj.get("author", {}), dict
+                ):
+                    continue
+                author = author_obj.get("author", {}).get("login", "")
 
-                    if author != self.environment_vars.username:
-                        for week in author_obj.get("weeks", []):
-                            total_additions += week.get("a", 0)
-                            total_deletions += week.get("d", 0)
-                    else:
-                        for week in author_obj.get("weeks", []):
-                            additions += week.get("a", 0)
-                            deletions += week.get("d", 0)
+                if author != self.environment_vars.username:
+                    for week in author_obj.get("weeks", []):
+                        total_additions += week.get("a", 0)
+                        total_deletions += week.get("d", 0)
+                else:
+                    for week in author_obj.get("weeks", []):
+                        additions += week.get("a", 0)
+                        deletions += week.get("d", 0)
 
         total_additions += additions
         total_deletions += deletions
@@ -369,14 +352,18 @@ class GitHubRepoStats(object):
                     today_view_count += view.get("count", 0)
                 elif view.get("timestamp")[:10] > last_viewed:
                     self.environment_vars.set_views(view.get("count", 0))
-                    dates.append(view.get("timestamp")[:10])
+                dates.append(view.get("timestamp")[:10])
 
         if self.environment_vars.maintain_repo_view_count:
             self.environment_vars.set_last_viewed(max(dates))
             self.environment_vars.set_views(today_view_count)
 
             if self.environment_vars.repo_first_viewed == "0000-00-00":
-                self.environment_vars.set_first_viewed(min(dates[1:]))
+                if len(dates) > 1:
+                    self.environment_vars.set_first_viewed(min(dates[1:]))
+                else:
+                    ystrdy = (date.today() - timedelta(1)).strftime('%Y-%m-%d')
+                    self.environment_vars.set_first_viewed(ystrdy)
             self._views_from_date = self.environment_vars.repo_first_viewed
         else:
             self._views_from_date = min(dates)
@@ -424,7 +411,11 @@ class GitHubRepoStats(object):
             self.environment_vars.set_clones(today_clone_count)
 
             if self.environment_vars.repo_first_cloned == "0000-00-00":
-                self.environment_vars.set_first_cloned(min(dates[1:]))
+                if len(dates) > 1:
+                    self.environment_vars.set_first_cloned(min(dates[1:]))
+                else:
+                    ystrdy = (date.today() - timedelta(1)).strftime('%Y-%m-%d')
+                    self.environment_vars.set_first_cloned(ystrdy)
             self._clones_from_date = self.environment_vars.repo_first_cloned
         else:
             self._clones_from_date = min(dates)
@@ -454,13 +445,12 @@ class GitHubRepoStats(object):
         collaborator_set = set()
 
         for repo in await self.repos:
-            if repo not in self._empty_repos:
-                r = await self.queries\
-                    .query_rest(f"/repos/{repo}/collaborators")
+            r = await self.queries\
+                .query_rest(f"/repos/{repo}/collaborators")
 
-                for obj in r:
-                    if isinstance(obj, dict):
-                        collaborator_set.add(obj.get("login"))
+            for obj in r:
+                if isinstance(obj, dict):
+                    collaborator_set.add(obj.get("login"))
 
         collabs = len(collaborator_set.union(await self.contributors)) - 1
         self._collaborators = collabs + self.environment_vars.more_collabs
@@ -477,13 +467,12 @@ class GitHubRepoStats(object):
         contributor_set = set()
 
         for repo in await self.repos:
-            if repo not in self._empty_repos:
-                r = await self.queries\
-                    .query_rest(f"/repos/{repo}/contributors")
+            r = await self.queries\
+                .query_rest(f"/repos/{repo}/contributors")
 
-                for obj in r:
-                    if isinstance(obj, dict):
-                        contributor_set.add(obj.get("login"))
+            for obj in r:
+                if isinstance(obj, dict):
+                    contributor_set.add(obj.get("login"))
 
         self._contributors = contributor_set
         return contributor_set
@@ -499,13 +488,12 @@ class GitHubRepoStats(object):
         self._pull_requests = 0
 
         for repo in await self.repos:
-            if repo not in self._empty_repos:
-                r = await self.queries\
-                    .query_rest(f"/repos/{repo}/pulls?state=all")
+            r = await self.queries\
+                .query_rest(f"/repos/{repo}/pulls?state=all")
 
-                for obj in r:
-                    if isinstance(obj, dict):
-                        self._pull_requests += 1
+            for obj in r:
+                if isinstance(obj, dict):
+                    self._pull_requests += 1
         return self._pull_requests
 
     @property
@@ -519,11 +507,10 @@ class GitHubRepoStats(object):
         self._issues = 0
 
         for repo in await self.repos:
-            if repo not in self._empty_repos:
-                r = await self.queries \
-                    .query_rest(f"/repos/{repo}/issues?state=all")
+            r = await self.queries\
+                .query_rest(f"/repos/{repo}/issues?state=all")
 
-                for obj in r:
-                    if isinstance(obj, dict):
-                        self._issues += 1
+            for obj in r:
+                if isinstance(obj, dict):
+                    self._issues += 1
         return self._issues

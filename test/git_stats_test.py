@@ -12,8 +12,11 @@ from src.github_repo_stats import GitHubRepoStats
 from src.environ_vars import EnvironmentVariables
 
 # REQUIRED
-ACCESS_TOKEN = getenv("ACCESS_TOKEN")  # or manually enter ACCESS_TOKEN string
-GITHUB_ACTOR = getenv("GITHUB_ACTOR")  # or manually enter "<GitHub Username>"
+# ACCESS_TOKEN = getenv("ACCESS_TOKEN")  # or manually enter ACCESS_TOKEN string
+# GITHUB_ACTOR = getenv("GITHUB_ACTOR")  # or manually enter "<GitHub Username>"
+
+ACCESS_TOKEN = "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"
+GITHUB_ACTOR = "R055A"
 
 # OPTIONAL
 EXCLUDED_REPOS = getenv("EXCLUDED")  # or enter: "<repo>,<repo>,...,<repo>"

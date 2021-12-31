@@ -83,10 +83,8 @@ class GenerateImages:
         output = sub("{{ contributions_percentage }}",
                      await self.__stats.contributions_percentage,
                      output)
-        repos_contributed_to = (len(await self.__stats.repos)) - \
-                               (len(await self.__stats.empty_repos))
         output = sub("{{ repos }}",
-                     f"{repos_contributed_to:,}",
+                     f"{len(await self.__stats.repos):,}",
                      output)
         output = sub("{{ collaborators }}",
                      f"{await self.__stats.collaborators:,}",
