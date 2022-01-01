@@ -17,6 +17,8 @@ class GitHubRepoStats(object):
     Retrieve and store statistics about GitHub usage.
     """
 
+    __DATE_FORMAT = '%Y-%m-%d'
+
     def __init__(self,
                  environment_vars: EnvironmentVariables,
                  session: ClientSession):
@@ -345,7 +347,7 @@ class GitHubRepoStats(object):
             return self._views
 
         last_viewed = self.environment_vars.repo_last_viewed
-        dates, today = [last_viewed], date.today().strftime('%Y-%m-%d')
+        dates, today = [last_viewed], date.today().strftime(self.__DATE_FORMAT)
 
         today_view_count = 0
         for repo in await self.repos:
@@ -356,25 +358,27 @@ class GitHubRepoStats(object):
                     today_view_count += view.get("count", 0)
                 elif view.get("timestamp")[:10] > last_viewed:
                     self.environment_vars.set_views(view.get("count", 0))
-                dates.append(view.get("timestamp")[:10])
+                    dates.append(view.get("timestamp")[:10])
 
         if last_viewed == "0000-00-00":
             if len(dates) == 1:
-                yesterday = (date.today() - timedelta(1)).strftime('%Y-%m-%d')
+                yesterday = (date.today() - timedelta(1))\
+                    .strftime(self.__DATE_FORMAT)
                 dates.append(yesterday)
             dates.remove(last_viewed)
 
         if self.environment_vars.maintain_repo_view_count:
             self.environment_vars.set_last_viewed(max(dates))
-            self.environment_vars.set_views(today_view_count)
 
             if self.environment_vars.repo_first_viewed == "0000-00-00":
-                self.environment_vars.set_first_viewed(min(dates))
+                self.environment_vars.repo_first_viewed = min(dates)
+            self.environment_vars. \
+                set_first_viewed(self.environment_vars.repo_first_viewed)
             self._views_from_date = self.environment_vars.repo_first_viewed
         else:
             self._views_from_date = min(dates)
 
-        self._views = self.environment_vars.repo_views
+        self._views = self.environment_vars.repo_views + today_view_count
         return self._views
 
     @property
@@ -399,7 +403,7 @@ class GitHubRepoStats(object):
             return self._clones
 
         last_cloned = self.environment_vars.repo_last_cloned
-        dates, today = [last_cloned], date.today().strftime('%Y-%m-%d')
+        dates, today = [last_cloned], date.today().strftime(self.__DATE_FORMAT)
 
         today_clone_count = 0
         for repo in await self.repos:
@@ -414,21 +418,23 @@ class GitHubRepoStats(object):
 
         if last_cloned == "0000-00-00":
             if len(dates) == 1:
-                yesterday = (date.today() - timedelta(1)).strftime('%Y-%m-%d')
+                yesterday = (date.today() - timedelta(1))\
+                    .strftime(self.__DATE_FORMAT)
                 dates.append(yesterday)
             dates.remove(last_cloned)
 
         if self.environment_vars.maintain_repo_clone_count:
             self.environment_vars.set_last_cloned(max(dates))
-            self.environment_vars.set_clones(today_clone_count)
 
             if self.environment_vars.repo_first_cloned == "0000-00-00":
-                self.environment_vars.set_first_cloned(min(dates))
+                self.environment_vars.repo_first_cloned = min(dates)
+            self.environment_vars.\
+                set_first_cloned(self.environment_vars.repo_first_cloned)
             self._clones_from_date = self.environment_vars.repo_first_cloned
         else:
             self._clones_from_date = min(dates)
 
-        self._clones = self.environment_vars.repo_clones
+        self._clones = self.environment_vars.repo_clones + today_clone_count
         return self._clones
 
     @property

@@ -44,7 +44,7 @@ async def main() -> None:
                                                      ACCESS_TOKEN,
                                                      EXCLUDED_REPOS,
                                                      EXCLUDED_LANGS,
-                                                     IGNORE_FORKED_REPOS,
+                                                     EXCLUDE_FORKED_REPOS,
                                                      REPO_VIEWS,
                                                      LAST_VIEWED,
                                                      FIRST_VIEWED,

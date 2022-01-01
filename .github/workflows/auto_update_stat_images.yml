@@ -50,8 +50,8 @@ jobs:
     # Switch to actions_branch if not exist, or create new actions_branch
     - name: Switch to actions_branch
       run: |
-        git pull
         git checkout actions_branch 2>/dev/null || git checkout -b actions_branch
+        git pull origin actions_branch
 
     # Install dependencies with `pip`
     - name: Install requirements

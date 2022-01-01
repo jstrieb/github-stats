@@ -2,6 +2,7 @@
 
 from os import getenv, environ
 from typing import Optional
+from datetime import datetime
 
 from src.db.db import GitRepoStatsDB
 
@@ -11,6 +12,8 @@ from src.db.db import GitRepoStatsDB
 
 
 class EnvironmentVariables:
+
+    __DATE_FORMAT = '%Y-%m-%d'
 
     def __init__(self,
                  username: str,
@@ -47,27 +50,47 @@ class EnvironmentVariables:
             )
 
         self.ignore_forked_repos = (
-                ignore_forked_repos
+                not not ignore_forked_repos
                 and ignore_forked_repos.strip().lower() == "true"
         )
 
         self.maintain_repo_view_count = (
                 not maintain_repo_view_count
-                or maintain_repo_view_count.strip().lower() == "true"
+                or maintain_repo_view_count.strip().lower() != "false"
         )
 
         if self.maintain_repo_view_count:
-            self.repo_views = int(repo_views) if repo_views else self.__db.views
+            try:
+                if repo_views:
+                    self.repo_views = int(repo_views)
+                    self.__db.set_views_count(self.repo_views)
+                else:
+                    self.repo_views = self.__db.views
+            except ValueError:
+                self.repo_views = self.__db.views
 
             if repo_last_viewed:
-                self.repo_last_viewed = repo_last_viewed
+                try:
+                    if repo_last_viewed == datetime\
+                            .strptime(repo_last_viewed, self.__DATE_FORMAT)\
+                            .strftime(self.__DATE_FORMAT):
+                        self.repo_last_viewed = repo_last_viewed
+                except ValueError:
+                    self.repo_last_viewed = self.__db.views_to_date
             else:
                 self.repo_last_viewed = self.__db.views_to_date
 
             if repo_first_viewed:
-                self.repo_first_viewed = repo_first_viewed
+                try:
+                    if repo_first_viewed == datetime\
+                            .strptime(repo_first_viewed, self.__DATE_FORMAT)\
+                            .strftime(self.__DATE_FORMAT):
+                        self.repo_first_viewed = repo_first_viewed
+                except ValueError:
+                    self.repo_first_viewed = self.__db.views_from_date
             else:
                 self.repo_first_viewed = self.__db.views_from_date
+
         else:
             self.repo_views = 0
             self.__db.set_views_count(self.repo_views)
@@ -78,19 +101,38 @@ class EnvironmentVariables:
 
         self.maintain_repo_clone_count = (
                 not maintain_repo_clone_count
-                or maintain_repo_clone_count.strip().lower() == "true"
+                or maintain_repo_clone_count.strip().lower() != "false"
         )
 
         if self.maintain_repo_clone_count:
-            self.repo_clones = int(repo_clones) if repo_clones else self.__db.clones
+            try:
+                if repo_clones:
+                    self.repo_clones = int(repo_clones)
+                    self.__db.set_clones_count(self.repo_clones)
+                else:
+                    self.repo_clones = self.__db.clones
+            except ValueError:
+                self.repo_clones = self.__db.clones
 
             if repo_last_cloned:
-                self.repo_last_cloned = repo_last_cloned
+                try:
+                    if repo_last_cloned == datetime\
+                            .strptime(repo_last_cloned, self.__DATE_FORMAT)\
+                            .strftime(self.__DATE_FORMAT):
+                        self.repo_last_cloned = repo_last_cloned
+                except ValueError:
+                    self.repo_last_cloned = self.__db.clones_to_date
             else:
                 self.repo_last_cloned = self.__db.clones_to_date
 
             if repo_first_cloned:
-                self.repo_first_cloned = repo_first_cloned
+                try:
+                    if repo_first_cloned == datetime\
+                            .strptime(repo_first_cloned, self.__DATE_FORMAT)\
+                            .strftime(self.__DATE_FORMAT):
+                        self.repo_first_cloned = repo_first_cloned
+                except ValueError:
+                    self.repo_first_cloned = self.__db.clones_from_date
             else:
                 self.repo_first_cloned = self.__db.clones_from_date
         else:
@@ -101,7 +143,10 @@ class EnvironmentVariables:
             self.__db.set_clones_from_date(self.repo_first_cloned)
             self.__db.set_clones_to_date(self.repo_last_cloned)
 
-        self.more_collabs = int(more_collabs) if more_collabs else 0
+        try:
+            self.more_collabs = int(more_collabs) if more_collabs else 0
+        except ValueError:
+            self.more_collabs = 0
 
     def set_views(self, views: any) -> None:
         self.repo_views += int(views)
