@@ -4,7 +4,7 @@ from typing import Dict, Optional, Set, Tuple, Any, cast
 from aiohttp import ClientSession
 from datetime import date, timedelta
 
-from src.environ_vars import EnvironmentVariables
+from src.env_vars import EnvironmentVariables
 from src.github_api_queries import GitHubApiQueries
 
 ###############################################################################
@@ -347,7 +347,9 @@ class GitHubRepoStats(object):
             return self._views
 
         last_viewed = self.environment_vars.repo_last_viewed
-        dates, today = [last_viewed], date.today().strftime(self.__DATE_FORMAT)
+        today = date.today().strftime(self.__DATE_FORMAT)
+        yesterday = (date.today() - timedelta(1)).strftime(self.__DATE_FORMAT)
+        dates = {last_viewed, yesterday}
 
         today_view_count = 0
         for repo in await self.repos:
@@ -358,17 +360,13 @@ class GitHubRepoStats(object):
                     today_view_count += view.get("count", 0)
                 elif view.get("timestamp")[:10] > last_viewed:
                     self.environment_vars.set_views(view.get("count", 0))
-                    dates.append(view.get("timestamp")[:10])
+                    dates.add(view.get("timestamp")[:10])
 
         if last_viewed == "0000-00-00":
-            if len(dates) == 1:
-                yesterday = (date.today() - timedelta(1))\
-                    .strftime(self.__DATE_FORMAT)
-                dates.append(yesterday)
             dates.remove(last_viewed)
 
         if self.environment_vars.maintain_repo_view_count:
-            self.environment_vars.set_last_viewed(max(dates))
+            self.environment_vars.set_last_viewed(yesterday)
 
             if self.environment_vars.repo_first_viewed == "0000-00-00":
                 self.environment_vars.repo_first_viewed = min(dates)
@@ -403,7 +401,9 @@ class GitHubRepoStats(object):
             return self._clones
 
         last_cloned = self.environment_vars.repo_last_cloned
-        dates, today = [last_cloned], date.today().strftime(self.__DATE_FORMAT)
+        today = date.today().strftime(self.__DATE_FORMAT)
+        yesterday = (date.today() - timedelta(1)).strftime(self.__DATE_FORMAT)
+        dates = {last_cloned, yesterday}
 
         today_clone_count = 0
         for repo in await self.repos:
@@ -414,17 +414,13 @@ class GitHubRepoStats(object):
                     today_clone_count += clone.get("count", 0)
                 elif clone.get("timestamp")[:10] > last_cloned:
                     self.environment_vars.set_clones(clone.get("count", 0))
-                    dates.append(clone.get("timestamp")[:10])
+                    dates.add(clone.get("timestamp")[:10])
 
         if last_cloned == "0000-00-00":
-            if len(dates) == 1:
-                yesterday = (date.today() - timedelta(1))\
-                    .strftime(self.__DATE_FORMAT)
-                dates.append(yesterday)
             dates.remove(last_cloned)
 
         if self.environment_vars.maintain_repo_clone_count:
-            self.environment_vars.set_last_cloned(max(dates))
+            self.environment_vars.set_last_cloned(yesterday)
 
             if self.environment_vars.repo_first_cloned == "0000-00-00":
                 self.environment_vars.repo_first_cloned = min(dates)

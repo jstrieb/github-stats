@@ -9,7 +9,7 @@ from aiohttp import ClientSession
 from os import getenv
 
 from src.github_repo_stats import GitHubRepoStats
-from src.environ_vars import EnvironmentVariables
+from src.env_vars import EnvironmentVariables
 
 # REQUIRED
 ACCESS_TOKEN = getenv("ACCESS_TOKEN")  # or manually enter ACCESS_TOKEN string

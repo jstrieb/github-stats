@@ -6,7 +6,7 @@ from os import mkdir, getenv
 from os.path import isdir
 from re import sub
 
-from src.environ_vars import EnvironmentVariables
+from src.env_vars import EnvironmentVariables
 from src.github_repo_stats import GitHubRepoStats
 
 OUTPUT_DIR = "generated_images"  # directory for storing generated images
