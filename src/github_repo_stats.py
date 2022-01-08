@@ -44,6 +44,7 @@ class GitHubRepoStats(object):
         self._clones_from_date: Optional[str] = None
         self._pull_requests: Optional[int] = None
         self._issues: Optional[int] = None
+        self._empty_repos: Optional[Set[str]] = None
 
     async def to_str(self) -> str:
         """
@@ -97,6 +98,7 @@ class GitHubRepoStats(object):
         self._forks = 0
         self._languages = dict()
         self._repos = set()
+        self._empty_repos = set()
 
         next_owned = None
         next_contrib = None
@@ -132,7 +134,7 @@ class GitHubRepoStats(object):
                 repos += contrib_repos.get("nodes", [])
 
             for repo in repos:
-                if not repo or len(repo.get("languages").get("edges")) == 0:
+                if not repo:
                     continue
 
                 name = repo.get("nameWithOwner")
@@ -140,6 +142,9 @@ class GitHubRepoStats(object):
                         name in self.environment_vars.exclude_repos:
                     continue
                 self._repos.add(name)
+
+                if len(repo.get("languages").get("edges")) == 0:
+                    self._empty_repos.add(name)
 
                 self._stargazers += repo.get("stargazers").get("totalCount", 0)
                 self._forks += repo.get("forkCount", 0)
@@ -284,12 +289,16 @@ class GitHubRepoStats(object):
         """
         if self._users_lines_changed is not None:
             return self._users_lines_changed
+        contributor_set = set()
         total_additions = 0
         total_deletions = 0
         additions = 0
         deletions = 0
 
         for repo in await self.repos:
+            if repo in self._empty_repos:
+                continue
+
             r = await self.queries\
                 .query_rest(f"/repos/{repo}/stats/contributors")
 
@@ -300,6 +309,7 @@ class GitHubRepoStats(object):
                 ):
                     continue
                 author = author_obj.get("author", {}).get("login", "")
+                contributor_set.add(author)
 
                 if author != self.environment_vars.username:
                     for week in author_obj.get("weeks", []):
@@ -309,6 +319,8 @@ class GitHubRepoStats(object):
                     for week in author_obj.get("weeks", []):
                         additions += week.get("a", 0)
                         deletions += week.get("d", 0)
+
+        self._contributors = contributor_set
 
         total_additions += additions
         total_deletions += deletions
@@ -473,19 +485,9 @@ class GitHubRepoStats(object):
         """
         if self._contributors is not None:
             return self._contributors
-
-        contributor_set = set()
-
-        for repo in await self.repos:
-            r = await self.queries\
-                .query_rest(f"/repos/{repo}/contributors")
-
-            for obj in r:
-                if isinstance(obj, dict):
-                    contributor_set.add(obj.get("login"))
-
-        self._contributors = contributor_set
-        return contributor_set
+        await self.lines_changed
+        assert self._contributors is not None
+        return self._contributors
 
     @property
     async def pull_requests(self) -> int:
