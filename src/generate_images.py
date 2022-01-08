@@ -40,7 +40,8 @@ class GenerateImages:
         if not user:
             raise RuntimeError("Environment variable GITHUB_ACTOR must be set")
 
-        self.__environment = EnvironmentVariables(user, access_token)
+        self.__environment = EnvironmentVariables(username=user,
+                                                  access_token=access_token)
         self.__stats = None
 
         run(self.start())
@@ -50,7 +51,8 @@ class GenerateImages:
         Main function: generate all badges
         """
         async with ClientSession() as session:
-            self.__stats = GitHubRepoStats(self.__environment, session)
+            self.__stats = GitHubRepoStats(environment_vars=self.__environment,
+                                           session=session)
             await gather(self.generate_languages(),
                          self.generate_overview())
 

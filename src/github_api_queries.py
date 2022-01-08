@@ -4,6 +4,8 @@ from asyncio import Semaphore, sleep
 from requests import post, get
 from aiohttp import ClientSession
 from typing import Dict, Optional, List
+from requests import get
+from json import loads
 
 ###############################################################################
 # GitHubApiQueries class
@@ -254,3 +256,8 @@ class GitHubApiQueries(object):
                     {by_years}
                 }}
             }}"""
+
+    @staticmethod
+    def get_language_colors():
+        url = get("https://raw.githubusercontent.com/ozh/github-colors/master/colors.json")
+        return loads(url.text)

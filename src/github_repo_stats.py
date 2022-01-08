@@ -23,9 +23,10 @@ class GitHubRepoStats(object):
                  environment_vars: EnvironmentVariables,
                  session: ClientSession):
         self.environment_vars: EnvironmentVariables = environment_vars
-        self.queries = GitHubApiQueries(self.environment_vars.username,
-                                        self.environment_vars.access_token,
-                                        session)
+        self.queries = GitHubApiQueries(
+            username=self.environment_vars.username,
+            access_token=self.environment_vars.access_token,
+            session=session)
 
         self._name: Optional[str] = None
         self._stargazers: Optional[int] = None
@@ -149,6 +150,10 @@ class GitHubRepoStats(object):
                 self._stargazers += repo.get("stargazers").get("totalCount", 0)
                 self._forks += repo.get("forkCount", 0)
 
+                if len(repo.get("languages").get("edges")) == 0:
+                    self._empty_repos.add(name)
+                    continue
+
                 for lang in repo.get("languages", {}).get("edges", []):
                     name = lang.get("node", {}).get("name", "Other")
                     languages = await self.languages
@@ -182,6 +187,36 @@ class GitHubRepoStats(object):
                     .get("endCursor", next_contrib)
             else:
                 break
+
+        env_repos = self.environment_vars.manually_added_repos
+        lang_cols = self.queries.get_language_colors()
+
+        for repo in env_repos:
+            self._repos.add(repo)
+            repo_stats = await self.queries.query_rest(f"/repos/{repo}")
+            self._stargazers += repo_stats.get("stargazers_count", 0)
+            self._forks += repo_stats.get("forks", 0)
+            langs = await self.queries.query_rest(f"/repos/{repo}/languages")
+
+            if len(langs) == 0:
+                self._empty_repos.add(repo)
+                continue
+
+            for lang, size in langs.items():
+                languages = await self.languages
+
+                if lang in self.environment_vars.exclude_langs:
+                    continue
+
+                if lang in languages:
+                    languages[lang]["size"] += size
+                    languages[lang]["occurrences"] += 1
+                else:
+                    languages[lang] = {
+                        "size": size,
+                        "occurrences": 1,
+                        "color": lang_cols.get(lang).get("color")
+                    }
 
         # TODO: Improve languages to scale by number of contributions to
         #       specific filetypes

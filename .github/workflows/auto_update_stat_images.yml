@@ -72,6 +72,7 @@ jobs:
         FIRST_CLONED: ${{ secrets.FIRST_CLONED }}
         MAINTAIN_REPO_CLONES: ${{ secrets.MAINTAIN_REPO_CLONES }}
         MORE_COLLABS: ${{ secrets.MORE_COLLABS }}
+        MORE_REPOS: ${{ secrets.MORE_REPOS }}
 
     # Commits all changed files to the repository
     - name: Commit to the repo
