@@ -91,6 +91,26 @@ class GitHubRepoStats(object):
         Project repository contributors: {len(await self.contributors) - 1:,}
         Languages:\n\t\t\t- {formatted_languages}"""
 
+    async def is_repo_valid(self, repo_name):
+        """
+        :param repo_name: the name of the repo in owner/name format
+        :return: True if repo is to be included in self._repos, False if not
+        """
+        # skip repo if already scraped
+        if repo_name in self._repos:
+            return False
+        # skip repo if a list of repos to only be included is given
+        # and the repo is not included in that list
+        if len(self.environment_vars.only_included_repos) > 0 and \
+                repo_name not in self.environment_vars.only_included_repos:
+            print(self.environment_vars.only_included_repos)
+            return False
+        # skip repo if a list of repos to be excluded is given
+        # and the repo is included in that list
+        if repo_name in self.environment_vars.exclude_repos:
+            return False
+        return True
+
     async def get_stats(self) -> None:
         """
         Get lots of summary stats using one big query. Sets many attributes
@@ -139,13 +159,9 @@ class GitHubRepoStats(object):
                     continue
 
                 name = repo.get("nameWithOwner")
-                if name in self._repos or \
-                        name in self.environment_vars.exclude_repos:
+                if not await self.is_repo_valid(name):
                     continue
                 self._repos.add(name)
-
-                if len(repo.get("languages").get("edges")) == 0:
-                    self._empty_repos.add(name)
 
                 self._stargazers += repo.get("stargazers").get("totalCount", 0)
                 self._forks += repo.get("forkCount", 0)
@@ -192,7 +208,10 @@ class GitHubRepoStats(object):
         lang_cols = self.queries.get_language_colors()
 
         for repo in env_repos:
+            if not await self.is_repo_valid(repo):
+                continue
             self._repos.add(repo)
+
             repo_stats = await self.queries.query_rest(f"/repos/{repo}")
             self._stargazers += repo_stats.get("stargazers_count", 0)
             self._forks += repo_stats.get("forks", 0)

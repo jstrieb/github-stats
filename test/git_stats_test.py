@@ -29,6 +29,7 @@ FIRST_CLONED = getenv("FIRST_CLONED")  # or enter: "YYYY-MM-DD"
 MAINTAIN_REPO_CLONES = getenv("SAVE_REPO_CLONES")  # or enter: "<bool>"
 MORE_COLLABS = getenv("MORE_COLLABS")  # or enter: "<int>"
 MORE_REPOS = getenv("MORE_REPOS")  # or enter: "<repo>,<repo>,...,<repo>"
+ONLY_INCLUDED = getenv("ONLY_INCLUDED")  # or enter: "<repo>,<repo>,...,<repo>"
 
 
 async def main() -> None:
@@ -57,7 +58,8 @@ async def main() -> None:
                 repo_first_cloned=FIRST_CLONED,
                 maintain_repo_clone_count=MAINTAIN_REPO_CLONES,
                 more_collabs=MORE_COLLABS,
-                manually_added_repos=MORE_REPOS),
+                manually_added_repos=MORE_REPOS,
+                only_included_repos=ONLY_INCLUDED),
             session=session)
         print(await stats.to_str())
 

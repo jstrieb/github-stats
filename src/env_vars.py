@@ -30,7 +30,8 @@ class EnvironmentVariables:
                  repo_first_cloned: Optional[str] = getenv("FIRST_CLONED"),
                  maintain_repo_clone_count: str = getenv("SAVE_REPO_CLONES"),
                  more_collabs: Optional[str] = getenv("MORE_COLLABS"),
-                 manually_added_repos: Optional[str] = getenv("MORE_REPOS")):
+                 manually_added_repos: Optional[str] = getenv("MORE_REPOS"),
+                 only_included_repos: Optional[str] = getenv("ONLY_INCLUDED")):
         self.__db = GitRepoStatsDB()
 
         self.username = username
@@ -154,6 +155,13 @@ class EnvironmentVariables:
         else:
             self.manually_added_repos = (
                 {x.strip() for x in manually_added_repos.split(",")}
+            )
+
+        if only_included_repos is None or only_included_repos == "":
+            self.only_included_repos = set()
+        else:
+            self.only_included_repos = (
+                {x.strip() for x in only_included_repos.split(",")}
             )
 
     def set_views(self, views: any) -> None:
