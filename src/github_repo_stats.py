@@ -37,6 +37,7 @@ class GitHubRepoStats(object):
         self._users_lines_changed: Optional[Tuple[int, int]] = None
         self._total_lines_changed: Optional[Tuple[int, int]] = None
         self._contributions_percentage: Optional[str] = None
+        self._avg_percent: Optional[str] = None
         self._views: Optional[int] = None
         self._clones: Optional[int] = None
         self._collaborators: Optional[int] = None
@@ -69,6 +70,7 @@ class GitHubRepoStats(object):
         else:
             prcnt_dltd = 0.0
         ttl_prcnt = await self.contributions_percentage
+        avg_prcnt = await self.avg_contribution_percent
 
         return f"""GitHub Repository Statistics:
         Stargazers: {await self.stargazers:,}
@@ -82,7 +84,8 @@ class GitHubRepoStats(object):
         Lines of code changed: {sum(users_lines_changed):,}
         Percentage of total code line additions: {prcnt_added:0.2f}%
         Percentage of total code line deletions: {prcnt_dltd:0.2f}%
-        Percentage of code change contributions: {float(ttl_prcnt[:-1]):0.2f}%
+        Percentage of code change contributions: {ttl_prcnt}
+        Avg. % of code change contributions: {avg_prcnt}
         Project page views: {await self.views:,}
         Project page views from date: {await self.views_from_date}
         Project repository clones: {await self.clones:,}
@@ -103,7 +106,6 @@ class GitHubRepoStats(object):
         # and the repo is not included in that list
         if len(self.environment_vars.only_included_repos) > 0 and \
                 repo_name not in self.environment_vars.only_included_repos:
-            print(self.environment_vars.only_included_repos)
             return False
         # skip repo if a list of repos to be excluded is given
         # and the repo is included in that list
@@ -339,6 +341,9 @@ class GitHubRepoStats(object):
     @property
     async def lines_changed(self) -> Tuple[int, int]:
         """
+        Fetches total lines added and deleted for user and repository total
+        Calculates total and average line changes for user
+        Calculates total contributors
         :return: count of total lines added, removed, or modified by the user
         """
         if self._users_lines_changed is not None:
@@ -348,10 +353,13 @@ class GitHubRepoStats(object):
         total_deletions = 0
         additions = 0
         deletions = 0
+        total_percentage = 0
 
         for repo in await self.repos:
             if repo in self._empty_repos:
                 continue
+            repo_total_changes = 0
+            author_total_changes = 0
 
             r = await self.queries\
                 .query_rest(f"/repos/{repo}/stats/contributors")
@@ -369,12 +377,23 @@ class GitHubRepoStats(object):
                     for week in author_obj.get("weeks", []):
                         total_additions += week.get("a", 0)
                         total_deletions += week.get("d", 0)
+                        repo_total_changes += week.get("a", 0)
+                        repo_total_changes += week.get("d", 0)
                 else:
                     for week in author_obj.get("weeks", []):
                         additions += week.get("a", 0)
                         deletions += week.get("d", 0)
+                        author_total_changes += week.get("a", 0)
+                        author_total_changes += week.get("d", 0)
 
-        self._contributors = contributor_set
+            repo_total_changes += author_total_changes
+            if author_total_changes > 0:
+                total_percentage += author_total_changes / repo_total_changes
+        if total_percentage > 0:
+            total_percentage /= len(self._repos) - len(self._empty_repos)
+        else:
+            total_percentage = 0.0
+        self._avg_percent = f"{total_percentage * 100:0.2f}%"
 
         total_additions += additions
         total_deletions += deletions
@@ -389,6 +408,8 @@ class GitHubRepoStats(object):
             percent_contribs = 0.0
         self._contributions_percentage = f"{percent_contribs:0.2f}%"
 
+        self._contributors = contributor_set
+
         return self._users_lines_changed
 
     @property
@@ -401,6 +422,17 @@ class GitHubRepoStats(object):
         await self.lines_changed
         assert self._contributions_percentage is not None
         return self._contributions_percentage
+
+    @property
+    async def avg_contribution_percent(self) -> str:
+        """
+        :return: str representing the avg percent of user's repo contributions
+        """
+        if self._avg_percent is not None:
+            return self._avg_percent
+        await self.lines_changed
+        assert self._avg_percent is not None
+        return self._avg_percent
 
     @property
     async def views(self) -> int:
@@ -578,5 +610,9 @@ class GitHubRepoStats(object):
 
             for obj in r:
                 if isinstance(obj, dict):
-                    self._issues += 1
+                    try:
+                        if obj.get("html_url").split("/")[-2] == "issues":
+                            self._issues += 1
+                    except AttributeError:
+                        continue
         return self._issues

@@ -125,12 +125,12 @@ class GenerateImages:
                                f"{changed:,}",
                                output_dark_mode)
 
-        contributions_percentage = await self.__stats.contributions_percentage
-        output_light_mode = sub("{{ contributions_percentage }}",
-                                contributions_percentage,
+        avg_contribution_percent = await self.__stats.avg_contribution_percent
+        output_light_mode = sub("{{ avg_contribution_percent }}",
+                                avg_contribution_percent,
                                 output_light_mode)
-        output_dark_mode = sub("{{ contributions_percentage }}",
-                               contributions_percentage,
+        output_dark_mode = sub("{{ avg_contribution_percent }}",
+                               avg_contribution_percent,
                                output_dark_mode)
 
         repos = f"{len(await self.__stats.repos):,}"
