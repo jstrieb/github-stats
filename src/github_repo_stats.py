@@ -463,7 +463,7 @@ class GitHubRepoStats(object):
         if last_viewed == "0000-00-00":
             dates.remove(last_viewed)
 
-        if self.environment_vars.maintain_repo_view_count:
+        if self.environment_vars.store_repo_view_count:
             self.environment_vars.set_last_viewed(yesterday)
 
             if self.environment_vars.repo_first_viewed == "0000-00-00":
@@ -517,7 +517,7 @@ class GitHubRepoStats(object):
         if last_cloned == "0000-00-00":
             dates.remove(last_cloned)
 
-        if self.environment_vars.maintain_repo_clone_count:
+        if self.environment_vars.store_repo_clone_count:
             self.environment_vars.set_last_cloned(yesterday)
 
             if self.environment_vars.repo_first_cloned == "0000-00-00":

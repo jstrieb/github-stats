@@ -24,11 +24,11 @@ class EnvironmentVariables:
                  repo_views: Optional[str] = getenv("REPO_VIEWS"),
                  repo_last_viewed: Optional[str] = getenv("LAST_VIEWED"),
                  repo_first_viewed: Optional[str] = getenv("FIRST_VIEWED"),
-                 maintain_repo_view_count: str = getenv("SAVE_REPO_VIEWS"),
+                 store_repo_view_count: str = getenv("STORE_REPO_VIEWS"),
                  repo_clones: Optional[str] = getenv("REPO_CLONES"),
                  repo_last_cloned: Optional[str] = getenv("LAST_CLONED"),
                  repo_first_cloned: Optional[str] = getenv("FIRST_CLONED"),
-                 maintain_repo_clone_count: str = getenv("SAVE_REPO_CLONES"),
+                 store_repo_clone_count: str = getenv("STORE_REPO_CLONES"),
                  more_collabs: Optional[str] = getenv("MORE_COLLABS"),
                  manually_added_repos: Optional[str] = getenv("MORE_REPOS"),
                  only_included_repos: Optional[str] = getenv("ONLY_INCLUDED")):
@@ -56,12 +56,12 @@ class EnvironmentVariables:
                 and ignore_forked_repos.strip().lower() == "true"
         )
 
-        self.maintain_repo_view_count = (
-                not maintain_repo_view_count
-                or maintain_repo_view_count.strip().lower() != "false"
+        self.store_repo_view_count = (
+                not store_repo_view_count
+                or store_repo_view_count.strip().lower() != "false"
         )
 
-        if self.maintain_repo_view_count:
+        if self.store_repo_view_count:
             try:
                 if repo_views:
                     self.repo_views = int(repo_views)
@@ -101,12 +101,12 @@ class EnvironmentVariables:
             self.__db.set_views_from_date(self.repo_first_viewed)
             self.__db.set_views_to_date(self.repo_last_viewed)
 
-        self.maintain_repo_clone_count = (
-                not maintain_repo_clone_count
-                or maintain_repo_clone_count.strip().lower() != "false"
+        self.store_repo_clone_count = (
+                not store_repo_clone_count
+                or store_repo_clone_count.strip().lower() != "false"
         )
 
-        if self.maintain_repo_clone_count:
+        if self.store_repo_clone_count:
             try:
                 if repo_clones:
                     self.repo_clones = int(repo_clones)

@@ -66,11 +66,11 @@ jobs:
         REPO_VIEWS: ${{ secrets.REPO_VIEWS }}
         LAST_VIEWED: ${{ secrets.LAST_VIEWED }}
         FIRST_VIEWED: ${{ secrets.FIRST_VIEWED }}
-        MAINTAIN_REPO_VIEWS: ${{ secrets.MAINTAIN_REPO_VIEWS }}
+        STORE_REPO_VIEWS: ${{ secrets.STORE_REPO_VIEWS }}
         REPO_CLONES: ${{ secrets.REPO_CLONES }}
         LAST_CLONED: ${{ secrets.LAST_CLONED }}
         FIRST_CLONED: ${{ secrets.FIRST_CLONED }}
-        MAINTAIN_REPO_CLONES: ${{ secrets.MAINTAIN_REPO_CLONES }}
+        STORE_REPO_CLONES: ${{ secrets.STORE_REPO_CLONES }}
         MORE_COLLABS: ${{ secrets.MORE_COLLABS }}
         MORE_REPOS: ${{ secrets.MORE_REPOS }}
         ONLY_INCLUDED: ${{ secrets.ONLY_INCLUDED }}
