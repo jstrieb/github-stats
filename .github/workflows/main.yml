@@ -39,7 +39,7 @@ jobs:
           EXCLUDED_LANGS: "Objective-C,ShaderLab,HLSL,PLpgSQL,Perl,Text,Go,Nunjucks,Makefile,Clojure,Inno Setup"
           INCLUDE_FORKED_REPOS: true
           EXCLUDE_CONTRIB_REPOS: false
-          EXCLUDE_ARCHIVE_REPOS: true
+          EXCLUDE_ARCHIVE_REPOS: false
           EXCLUDE_PRIVATE_REPOS: false
           EXCLUDE_PUBLIC_REPOS: false
           STORE_REPO_VIEWS: true

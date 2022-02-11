@@ -126,13 +126,15 @@ class GenerateImages:
                      output)
 
         views_from = (await self.__stats.views_from_date)
+        views_to = (await self.__stats.views_to_date)
         output = sub("{{ views_from_date }}",
-                     f"Repository views (as of {views_from})",
+                     f"Repository views ({views_from} to {views_to})",
                      output)
 
         clones_from = (await self.__stats.clones_from_date)
+        clones_to = (await self.__stats.clones_to_date)
         output = sub("{{ clones_from_date }}",
-                     f"Repository clones (as of {clones_from})",
+                     f"Repository clones ({clones_from} to {views_to})",
                      output)
 
         issues = f"{await self.__stats.issues:,}"
