@@ -1,74 +1,56 @@
-# This is a basic workflow to help you get started with Actions
-
 name: Generate Stats Images
-
-# Controls when the action will run. Triggers the workflow on push events
 on:
   workflow_dispatch:
   push:
-    branches: [ master ]
+    branches: [master]
   schedule:
     - cron: "0 0 * * *"
-
-# A workflow run is made up of one or more jobs that can run sequentially or in
-# parallel
 jobs:
-  # This workflow contains a single job called "build"
   build:
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
-
-    # Sequence of tasks that will be executed as part of the job
     steps:
-    # Checks-out repository under $GITHUB_WORKSPACE, so the job can access it
-    - uses: actions/checkout@v2
-
-    - name: Configure GPG Key
-      run: echo -n "$GPG_KEY" | gpg --import
-      env:
-        GPG_KEY: ${{ secrets.GPG_KEY }}
-
-    # Run using Python 3.8 for consistency and aiohttp
-    - name: Set up Python 3.8
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.8'
-        architecture: 'x64'
-
-    # Cache dependencies. From:
-    # https://github.com/actions/cache/blob/master/examples.md#python---pip
-    - uses: actions/cache@v2
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-
-    # Install dependencies with `pip`
-    - name: Install requirements
-      run: |
-        python3 -m pip install --upgrade pip setuptools wheel
-        python3 -m pip install -r requirements.txt
-
-    # Generate all statistics images
-    - name: Generate images
-      run: |
-        python3 --version
-        python3 generate_images.py
-      env:
-        ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
-        EXCLUDED: 'wopian/github-stats,jstrieb/github-stats,wopian/kitsu-csp,wopian/wopian.moe,wopian/codingame,wopian/wwmcc,wopian/skylark,wopian/whatpulse-stats,jwoods02/Mosaic-Island-Timesheet-System,wopian/bucks-new-university,wopian/random-number-game,hummingbird-me/kitsu-tools,hummingbird-me/kitsu-server,hummingbird-me/kitsu-web,alexcosta97/mac-setup,hussein181/C0699PropertyProject,alexcosta97/web-apps-project,jwoods02/game.jwoods.me,tonsky/FiraCode,JanDeDobbeleeer/oh-my-posh,otakulogy/anime-streaming,GoogleChrome/workbox,visionmedia/superagent,apideck-libraries/better-ajv-errors'
-        EXCLUDED_LANGS: 'PHP,Java,HTML,YAML,INI,Assembly,Objective-C,ShaderLab,HLSL,PLpgSQL,Ruby,TeX,Shell,C#,Handlebars,Pug,Perl,Haml,Dockerfile,Python,Text,Go,Nunjucks,Makefile,Clojure,PowerShell,Inno Setup'
-        EXCLUDE_FORKED_REPOS: false
-
-    # Commits all changed files to the repository
-    - name: Commit to the repo
-      run: |
-        git config --global user.name ${{ secrets.GH_USERNAME }}
-        git config --global user.email ${{ secrets.GH_EMAIL }}
-        git config --global user.signingkey ${{ secrets.GPG_SIGNING_KEY }}
-        git config --global commit.gpgsign true
-        git add .
-        # "echo" returns true so the build succeeds, even if no changed files
-        git commit -m 'Update generated files' || echo
-        git push
+      - uses: actions/checkout@v2
+      - name: Configure GPG Key
+        run: echo -n "$GPG_KEY" | gpg --import
+        env:
+          GPG_KEY: ${{ secrets.GPG_KEY }}
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.10"
+          architecture: "x64"
+      - uses: actions/cache@v2
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      - name: Install requirements
+        run: |
+          python3 -m pip install --upgrade pip setuptools wheel
+          python3 -m pip install -r requirements.txt
+      - name: Generate images
+        run: |
+          python3 --version
+          python3 generate.py
+        env:
+          ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          EXCLUDED: "wopian/github-stats,jstrieb/github-stats,wopian/kitsu-csp,wopian/wopian.moe,wopian/codingame,wopian/wwmcc,wopian/skylark,wopian/whatpulse-stats,jwoods02/Mosaic-Island-Timesheet-System,wopian/bucks-new-university,wopian/random-number-game,hummingbird-me/kitsu-tools,hummingbird-me/kitsu-server,hummingbird-me/kitsu-web,alexcosta97/mac-setup,hussein181/C0699PropertyProject,alexcosta97/web-apps-project,jwoods02/game.jwoods.me,tonsky/FiraCode,JanDeDobbeleeer/oh-my-posh,otakulogy/anime-streaming,GoogleChrome/workbox,visionmedia/superagent,apideck-libraries/better-ajv-errors"
+          EXCLUDED_LANGS: "PHP,Java,HTML,YAML,INI,Assembly,Objective-C,ShaderLab,HLSL,PLpgSQL,Ruby,TeX,Shell,C#,Handlebars,Pug,Perl,Haml,Dockerfile,Python,Text,Go,Nunjucks,Makefile,Clojure,PowerShell,Inno Setup"
+          INCLUDE_FORKED_REPOS: true
+          EXCLUDE_CONTRIB_REPOS: false
+          EXCLUDE_ARCHIVE_REPOS: true
+          EXCLUDE_PRIVATE_REPOS: false
+          EXCLUDE_PUBLIC_REPOS: false
+          STORE_REPO_VIEWS: true
+          STORE_REPO_CLONES: true
+      - name: Commit to the repo
+        run: |
+          git config --global user.name ${{ secrets.GH_USERNAME }}
+          git config --global user.email ${{ secrets.GH_EMAIL }}
+          git config --global user.signingkey ${{ secrets.GPG_SIGNING_KEY }}
+          git config --global commit.gpgsign true
+          git add .
+          # "echo" returns true so the build succeeds, even if no changed files
+          git commit -m 'Update daily stats' || echo
+          git push
