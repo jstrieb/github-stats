@@ -43,7 +43,9 @@ class GitHubRepoStats(object):
         self._collaborators: Optional[int] = None
         self._contributors: Optional[Set[str]] = None
         self._views_from_date: Optional[str] = None
+        self._views_to_date: Optional[str] = None
         self._clones_from_date: Optional[str] = None
+        self._clones_to_date: Optional[str] = None
         self._pull_requests: Optional[int] = None
         self._issues: Optional[int] = None
         self._empty_repos: Optional[Set[str]] = None
@@ -518,6 +520,17 @@ class GitHubRepoStats(object):
         return self._views_from_date
 
     @property
+    async def views_to_date(self) -> str:
+        """
+        :return: the first date included in the repo view count
+        """
+        if self._views_to_date is not None:
+            return self._views_to_date
+        await self.views
+        assert self._views_to_date is not None
+        return self._views_to_date
+
+    @property
     async def clones(self) -> int:
         """
         Note: API returns a user's repository clone data for the last 14 days.
@@ -570,6 +583,17 @@ class GitHubRepoStats(object):
         await self.clones
         assert self._clones_from_date is not None
         return self._clones_from_date
+
+    @property
+    async def clones_to_date(self) -> str:
+        """
+        :return: the first date included in the repo clone count
+        """
+        if self._clones_to_date is not None:
+            return self._clones_to_date
+        await self.clones
+        assert self._clones_to_date is not None
+        return self._clones_to_date
 
     @property
     async def collaborators(self) -> int:
