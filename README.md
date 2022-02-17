@@ -83,8 +83,8 @@ For more information on inaccuracies, see issue
      `jstrieb/github-stats`) separated by commas to a new secret—created as
      before—called `EXCLUDED`.
    - To ignore certain languages, add them (separated by commas) to a new
-     secret called `EXCLUDED_LANGS`. E.g. to exclude HTML and TeX you could set
-     the value to `html,tex`.
+     secret called `EXCLUDED_LANGS`. For example, to exclude HTML and TeX you
+     could set the value to `html,tex`.
    - To show statistics only for "owned" repositories and not forks with
      contributions, add an environment variable (under the `env` header in the
      [main
