@@ -304,6 +304,8 @@ Languages:
         self._languages = dict()
         self._repos = set()
 
+        exclude_langs_lower = {x.lower() for x in self._exclude_langs}
+
         next_owned = None
         next_contrib = None
         while True:
@@ -348,7 +350,7 @@ Languages:
                 for lang in repo.get("languages", {}).get("edges", []):
                     name = lang.get("node", {}).get("name", "Other")
                     languages = await self.languages
-                    if name in self._exclude_langs:
+                    if name.lower() in exclude_langs_lower:
                         continue
                     if name in languages:
                         languages[name]["size"] += lang.get("size", 0)
