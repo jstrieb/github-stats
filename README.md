@@ -16,7 +16,7 @@ interesting stats to display.
 ## Background
 
 When someone views a profile on GitHub, it is often because they are curious
-about a user's open source projects and contributions. Unfortunately, that
+about a user's open-source projects and contributions. Unfortunately, that
 user's stars, forks, and pinned repositories do not necessarily reflect the
 contributions they make to private repositories. The data likewise does not
 present a complete picture of the user's total contributions beyond the current
@@ -24,7 +24,7 @@ year.
 
 This project aims to collect a variety of profile and repository statistics
 using the GitHub API. It then generates images that can be displayed in
-repository READMEs, or in a user's [Profile
+repository README.md's, or a user's [Profile
 README](https://docs.github.com/en/github/setting-up-and-managing-your-github-profile/managing-your-profile-readme).
 
 Since the project runs on GitHub Actions, no server is required to regularly
@@ -119,7 +119,7 @@ There are a few things you can do to support the project:
 - Share and upvote on sites like Twitter, Reddit, and Hacker News
 - Report any bugs, glitches, or errors that you find
 
-These things motivate me to to keep sharing what I build, and they provide
+These things motivate me to keep sharing what I build, and they provide
 validation that my work is appreciated! They also help me improve the
 project. Thanks in advance!
 
@@ -140,3 +140,15 @@ releasing work publicly on the Web.
   [anuraghazra/github-readme-stats](https://github.com/anuraghazra/github-readme-stats)
 - Makes use of [GitHub Octicons](https://primer.style/octicons/) to precisely
   match the GitHub UI
+
+### Notable Modifications
+
+* [R055A/GitStats](https://github.com/R055A/GitStats): additional statistics, more options, dark mode support, and a separate branch for actions. 
+    <details>
+        <summary>
+            Click to view generated images
+        </summary>
+    
+    ![GitStats Overview - Light](https://raw.githubusercontent.com/R055A/GitStats/actions_branch/generated_images/overviewLightMode.svg#gh-light-mode-only)![GitStats Overview - Dark](https://raw.githubusercontent.com/R055A/GitStats/actions_branch/generated_images/overviewDarkMode.svg#gh-dark-mode-only)![GitStats Languages - Light](https://raw.githubusercontent.com/R055A/GitStats/actions_branch/generated_images/languagesLightMode.svg#gh-light-mode-only)![GitStats Languages - Dark](https://raw.githubusercontent.com/R055A/GitStats/actions_branch/generated_images/languagesDarkMode.svg#gh-dark-mode-only)
+
+    </details>
