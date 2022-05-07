@@ -47,10 +47,7 @@ td {
 
 tr {
   transform: translateX(-200%);
-  animation-duration: 2s;
-  animation-name: slideIn;
-  animation-function: ease-in-out;
-  animation-fill-mode: forwards;
+  animation: slideIn 2s ease-in-out forwards;
 }
 
 .octicon {
