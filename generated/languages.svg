@@ -45,10 +45,7 @@ li {
   align-items: center;
   flex-wrap: nowrap;
   transform: translateX(-500%);
-  animation-duration: 2s;
-  animation-name: slideIn;
-  animation-function: ease-in-out;
-  animation-fill-mode: forwards;
+  animation: slideIn 2s ease-in-out forwards;
 }
 
 @keyframes slideIn {
