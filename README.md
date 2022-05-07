@@ -13,10 +13,11 @@ https://github.community/t/support-theme-context-for-images-in-light-vs-dark-mod
 </a>
 
 Generate visualizations of GitHub user and repository statistics using GitHub
-Actions.
+Actions. Visualizations can be set to include data for private repositories,
+and repositories you have contributed to, but do not own.
 
-This project is currently a work-in-progress; there will always be more
-interesting stats to display.
+Generated images automatically switch between GitHub light theme and GitHub
+dark theme.
 
 ## Background
 
