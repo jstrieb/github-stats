@@ -55,7 +55,7 @@ td {
 }
 
 #gh-dark-mode-only:target td {
-  color: #8b949e;
+  color: #c9d1d9;
 }
 
 tr {
