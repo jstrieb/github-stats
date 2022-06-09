@@ -36,7 +36,7 @@ jobs:
         env:
           ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
           EXCLUDED: "wopian/github-stats,jstrieb/github-stats,wopian/kitsu-csp,wopian/wopian.moe,wopian/codingame,wopian/wwmcc,wopian/skylark,wopian/whatpulse-stats,jwoods02/Mosaic-Island-Timesheet-System,wopian/bucks-new-university,wopian/random-number-game,hummingbird-me/kitsu-tools,hummingbird-me/kitsu-server,hummingbird-me/kitsu-web,alexcosta97/mac-setup,hussein181/C0699PropertyProject,alexcosta97/web-apps-project,jwoods02/game.jwoods.me,tonsky/FiraCode,JanDeDobbeleeer/oh-my-posh,otakulogy/anime-streaming,GoogleChrome/workbox,visionmedia/superagent,apideck-libraries/better-ajv-errors"
-          EXCLUDED_LANGS: "Objective-C,ShaderLab,HLSL,PLpgSQL,Perl,Text,Go,Nunjucks,Makefile,Clojure,Inno Setup"
+          EXCLUDED_LANGS: "Objective-C,ShaderLab,HLSL,PLpgSQL,Perl,Text,Go,Nunjucks,Makefile,Clojure,Inno Setup,Assembly"
           INCLUDE_FORKED_REPOS: true
           EXCLUDE_CONTRIB_REPOS: false
           EXCLUDE_ARCHIVE_REPOS: false
