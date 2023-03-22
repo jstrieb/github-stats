@@ -35,6 +35,7 @@ jobs:
     # Generate all statistics images
     - name: Generate images
       run: |
+        git pull
         python3 --version
         python3 generate_images.py
       env:
