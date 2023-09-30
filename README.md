@@ -100,8 +100,7 @@ For more information on inaccuracies, see issue
      information about private repositories. If you're not worried about that,
      you can change the values directly [in the Actions workflow
      itself](https://github.com/jstrieb/github-stats/blob/05de1314b870febd44d19ad2f55d5e59d83f5857/.github/workflows/main.yml#L48-L53).
-6. Go to the [Actions
-   Page](../../actions?query=workflow%3A"Generate+Stats+Images") and press "Run
+6. Go to the [Actions Page](../../actions?query=workflow%3A"Generate+Stats+Images") and press "Run
    Workflow" on the right side of the screen to generate images for the first
    time. 
    - The images will be automatically regenerated every 24 hours, but they can
