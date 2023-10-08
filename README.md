@@ -83,6 +83,8 @@ For more information on inaccuracies, see issue
    newly-created repository and go to the "Secrets" page (bottom left).
 4. Create a new secret with the name `ACCESS_TOKEN` and paste the copied
    personal access token as the value.
+   -  If personal access token is not generated, then go to [tokens](https://github.com/settings/tokens) and 
+      click on Generate new token to generate a new token and use it.
 5. It is possible to change the type of statistics reported by adding other
    repository secrets. 
    - To ignore certain repos, add them (in owner/name format e.g.,
