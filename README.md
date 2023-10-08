@@ -83,7 +83,9 @@ For more information on inaccuracies, see issue
    newly-created repository and go to the "Secrets" page (bottom left).
 4. Create a new secret with the name `ACCESS_TOKEN` and paste the copied
    personal access token as the value.
-5. It is possible to change the type of statistics reported by adding other
+   - If personal access token is not generated, then go to [tokens](https://github.com/settings/tokens) and 
+      click on Generate new token to generate a new token and use it
+6. It is possible to change the type of statistics reported by adding other
    repository secrets. 
    - To ignore certain repos, add them (in owner/name format e.g.,
      `jstrieb/github-stats`) separated by commas to a new secret—created as
@@ -100,15 +102,15 @@ For more information on inaccuracies, see issue
      information about private repositories. If you're not worried about that,
      you can change the values directly [in the Actions workflow
      itself](https://github.com/jstrieb/github-stats/blob/05de1314b870febd44d19ad2f55d5e59d83f5857/.github/workflows/main.yml#L48-L53).
-6. Go to the [Actions
+7. Go to the [Actions
    Page](../../actions?query=workflow%3A"Generate+Stats+Images") and press "Run
    Workflow" on the right side of the screen to generate images for the first
    time. 
    - The images will be automatically regenerated every 24 hours, but they can
      be regenerated manually by running the workflow this way.
-7. Take a look at the images that have been created in the
+8. Take a look at the images that have been created in the
    [`generated`](generated) folder.
-8. To add your statistics to your GitHub Profile README, copy and paste the
+9. To add your statistics to your GitHub Profile README, copy and paste the
    following lines of code into your markdown content. Change the `username`
    value to your GitHub username.
    ```md
@@ -119,9 +121,9 @@ For more information on inaccuracies, see issue
    ![](https://raw.githubusercontent.com/username/github-stats/master/generated/languages.svg#gh-dark-mode-only)
    ![](https://raw.githubusercontent.com/username/github-stats/master/generated/languages.svg#gh-light-mode-only)
    ```
-9. Link back to this repository so that others can generate their own
+10. Link back to this repository so that others can generate their own
    statistics images.
-10. Star this repo if you like it!
+11. Star this repo if you like it!
 
 
 # Support the Project
