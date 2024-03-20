@@ -123,6 +123,25 @@ For more information on inaccuracies, see issue
    statistics images.
 10. Star this repo if you like it!
 
+# FAQ
+
+1. Display more languages
+
+In `templates/languages.svg`
+```svg
+<svg id="gh-dark-mode-only" width="360" height="210" xmlns="http://www.w3.org/2000/svg">
+```
+Modify the parameters of width and height. This is related to the size of your image.
+
+In `generate_images` line77 
+```svg
+viewBox="0 0 16 16" version="1.1" width="16" height="16"><path
+```
+Modify the parameters of viewBox and width and height to make sure they are the same. This is related to the small dot in front of the displayed language
+
+2. No name's github stats
+
+This exception usually occurs when you are using `Fine-graned tokens`, try switching to `tokens (classic)` to make sure it displays properly.
 
 # Support the Project
 
