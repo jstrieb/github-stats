@@ -132,7 +132,7 @@ There are a few things you can do to support the project:
 - Share and upvote on sites like Twitter, Reddit, and Hacker News
 - Report any bugs, glitches, or errors that you find
 
-These things motivate me to to keep sharing what I build, and they provide
+These things motivate me to keep sharing what I build, and they provide
 validation that my work is appreciated! They also help me improve the
 project. Thanks in advance!
 
