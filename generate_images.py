@@ -117,7 +117,7 @@ async def main() -> None:
     # Convert a truthy value to a Boolean
     raw_ignore_forked_repos = os.getenv("EXCLUDE_FORKED_REPOS")
     ignore_forked_repos = (
-        not not raw_ignore_forked_repos
+        raw_ignore_forked_repos
         and raw_ignore_forked_repos.strip().lower() != "false"
     )
     async with aiohttp.ClientSession() as session:
