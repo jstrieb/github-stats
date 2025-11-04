@@ -115,10 +115,16 @@ async def main() -> None:
         {x.strip() for x in exclude_langs.split(",")} if exclude_langs else None
     )
     # Convert a truthy value to a Boolean
-    raw_ignore_forked_repos = os.getenv("EXCLUDE_FORKED_REPOS")
-    ignore_forked_repos = (
-        not not raw_ignore_forked_repos
-        and raw_ignore_forked_repos.strip().lower() != "false"
+    # Try new name first, fall back to old name for backward compatibility
+    raw_exclude_contrib_repos = os.getenv("EXCLUDE_CONTRIB_REPOS")
+    if raw_exclude_contrib_repos is None:
+        raw_exclude_contrib_repos = os.getenv("EXCLUDE_FORKED_REPOS")
+        if raw_exclude_contrib_repos is not None:
+            print("WARNING: EXCLUDE_FORKED_REPOS is deprecated. Please use EXCLUDE_CONTRIB_REPOS instead.")
+
+    exclude_contrib_repos = (
+        not not raw_exclude_contrib_repos
+        and raw_exclude_contrib_repos.strip().lower() != "false"
     )
     async with aiohttp.ClientSession() as session:
         s = Stats(
@@ -127,7 +133,7 @@ async def main() -> None:
             session,
             exclude_repos=excluded_repos,
             exclude_langs=excluded_langs,
-            ignore_forked_repos=ignore_forked_repos,
+            exclude_contrib_repos=exclude_contrib_repos,
         )
         await asyncio.gather(generate_languages(s), generate_overview(s))
 

@@ -257,10 +257,10 @@ class Stats(object):
         session: aiohttp.ClientSession,
         exclude_repos: Optional[Set] = None,
         exclude_langs: Optional[Set] = None,
-        ignore_forked_repos: bool = False,
+        exclude_contrib_repos: bool = False,
     ):
         self.username = username
-        self._ignore_forked_repos = ignore_forked_repos
+        self._exclude_contrib_repos = exclude_contrib_repos
         self._exclude_repos = set() if exclude_repos is None else exclude_repos
         self._exclude_langs = set() if exclude_langs is None else exclude_langs
         self.queries = Queries(username, access_token, session)
@@ -334,7 +334,7 @@ Languages:
             )
 
             repos = owned_repos.get("nodes", [])
-            if not self._ignore_forked_repos:
+            if not self._exclude_contrib_repos:
                 repos += contrib_repos.get("nodes", [])
 
             for repo in repos:
