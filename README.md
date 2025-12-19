@@ -91,11 +91,14 @@ For more information on inaccuracies, see issue
    - To ignore certain languages, add them (separated by commas) to a new
      secret called `EXCLUDED_LANGS`. For example, to exclude HTML and TeX you
      could set the value to `html,tex`.
-   - To show statistics only for "owned" repositories and not forks with
-     contributions, add an environment variable (under the `env` header in the
-     [main
-     workflow](https://github.com/jstrieb/github-stats/blob/master/.github/workflows/main.yml))
-     called `EXCLUDE_FORKED_REPOS` with a value of `true`.
+   - By default, statistics include your owned repositories (non-forks) AND
+     repositories you've contributed to. Note: Contributed repositories count
+     their entire stars/forks/languages (not proportional to your contributions);
+     only "lines changed" reflects your actual contributions. To exclude
+     contributed repositories, set `EXCLUDE_CONTRIB_REPOS: true` in the `env`
+     section of the [main
+     workflow](https://github.com/jstrieb/github-stats/blob/master/.github/workflows/main.yml).
+     Your forked repositories are never counted as "owned".
    - These other values are added as secrets by default to prevent leaking
      information about private repositories. If you're not worried about that,
      you can change the values directly [in the Actions workflow
