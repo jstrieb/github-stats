@@ -20,20 +20,30 @@ fn logFn(
 }
 
 /// Naive, unoptimized HTTP client with .get and .post methods. Simple, and not
-/// particularly efficient.
+/// particularly efficient. Response bodies stay allocated for the lifetime of
+/// the client.
 const Client = struct {
+    arena: *std.heap.ArenaAllocator,
+    allocator: std.mem.Allocator,
     client: std.http.Client,
 
     const Self = @This();
 
-    pub fn init() Self {
+    pub fn init() !Self {
+        const arena = try allocator.create(std.heap.ArenaAllocator);
+        arena.* = std.heap.ArenaAllocator.init(allocator);
+        const a = arena.allocator();
         return .{
-            .client = .{ .allocator = allocator },
+            .arena = arena,
+            .allocator = a,
+            .client = .{ .allocator = a },
         };
     }
 
     pub fn deinit(self: *Self) void {
         self.client.deinit();
+        self.arena.deinit();
+        allocator.destroy(self.arena);
     }
 
     pub fn get(
@@ -41,7 +51,10 @@ const Client = struct {
         url: []const u8,
         headers: ?std.http.Client.Request.Headers,
     ) ![]u8 {
-        var writer = try std.Io.Writer.Allocating.initCapacity(allocator, 1024);
+        var writer = try std.Io.Writer.Allocating.initCapacity(
+            self.allocator,
+            1024,
+        );
         defer writer.deinit();
         _ = try self.client.fetch(.{
             .location = .{ .url = url },
@@ -57,7 +70,10 @@ const Client = struct {
         body: []const u8,
         headers: ?std.http.Client.Request.Headers,
     ) ![]u8 {
-        var writer = try std.Io.Writer.Allocating.initCapacity(allocator, 1024);
+        var writer = try std.Io.Writer.Allocating.initCapacity(
+            self.allocator,
+            1024,
+        );
         defer writer.deinit();
         _ = try self.client.fetch(.{
             .location = .{ .url = url },
@@ -77,21 +93,19 @@ pub fn main() !void {
     // TODO: Parse environment variables
     // TODO: Parse CLI flags
 
-    var client: Client = .init();
+    var client: Client = try .init();
     defer client.deinit();
-    var body = try client.get("https://jstrieb.github.io", null);
-    std.log.debug("{s}\n", .{body[0..100]});
-    allocator.free(body);
-
-    body = try client.post(
-        "https://httpbin.org/post",
-        "{\"a\": 10, \"b\": [ 1, 2, 3 ]}",
-        .{ .content_type = .{ .override = "application/json" } },
-    );
-    defer allocator.free(body);
-    std.log.debug("{s}\n", .{body});
+    std.log.debug("{s}\n", .{
+        try client.get("https://jstrieb.github.io", null),
+    });
+    std.log.debug("{s}\n", .{
+        try client.post(
+            "https://httpbin.org/post",
+            "{\"a\": 10, \"b\": [ 1, 2, 3 ]}",
+            .{ .content_type = .{ .override = "application/json" } },
+        ),
+    });
 
     // TODO: Download statistics to populate data structures
-
     // TODO: Output images from templates
 }
