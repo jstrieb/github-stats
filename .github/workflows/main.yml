@@ -2,7 +2,8 @@ name: Generate Stats Images
 
 on:
   push:
-    branches: [ master ]
+    branches: 
+      - master
   schedule:
     - cron: "5 0 * * *"
   workflow_dispatch:
@@ -15,28 +16,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # Check out repository under $GITHUB_WORKSPACE, so the job can access it
     - uses: actions/checkout@v3
-
-    # Run using Python 3.8 for consistency and aiohttp
-    - name: Set up Python 3.8
-      uses: actions/setup-python@v4
+    - uses: mlugg/setup-zig@v2
       with:
-        python-version: '3.8'
-        architecture: 'x64'
-        cache: 'pip'
+        version: 0.15.2
 
-    # Install dependencies with `pip`
-    - name: Install requirements
+    # TODO: Cache build
+    - name: Build
       run: |
-        python3 -m pip install --upgrade pip setuptools wheel
-        python3 -m pip install -r requirements.txt
+        echo TODO
 
-    # Generate all statistics images
     - name: Generate images
       run: |
-        python3 --version
-        python3 generate_images.py
+        echo TODO
       env:
         ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
