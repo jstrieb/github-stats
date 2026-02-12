@@ -49,7 +49,7 @@ const Client = struct {
     pub fn get(
         self: *Self,
         url: []const u8,
-        headers: ?std.http.Client.Request.Headers,
+        headers: std.http.Client.Request.Headers,
     ) ![]u8 {
         var writer = try std.Io.Writer.Allocating.initCapacity(
             self.allocator,
@@ -59,7 +59,7 @@ const Client = struct {
         _ = try self.client.fetch(.{
             .location = .{ .url = url },
             .response_writer = &writer.writer,
-            .headers = headers orelse .{},
+            .headers = headers,
         });
         return try writer.toOwnedSlice();
     }
@@ -68,7 +68,7 @@ const Client = struct {
         self: *Self,
         url: []const u8,
         body: []const u8,
-        headers: ?std.http.Client.Request.Headers,
+        headers: std.http.Client.Request.Headers,
     ) ![]u8 {
         var writer = try std.Io.Writer.Allocating.initCapacity(
             self.allocator,
@@ -79,7 +79,7 @@ const Client = struct {
             .location = .{ .url = url },
             .response_writer = &writer.writer,
             .payload = body,
-            .headers = headers orelse .{},
+            .headers = headers,
         });
         return try writer.toOwnedSlice();
     }
@@ -96,7 +96,7 @@ pub fn main() !void {
     var client: Client = try .init();
     defer client.deinit();
     std.log.debug("{s}\n", .{
-        try client.get("https://jstrieb.github.io", null),
+        try client.get("https://jstrieb.github.io", .{}),
     });
     std.log.debug("{s}\n", .{
         try client.post(
