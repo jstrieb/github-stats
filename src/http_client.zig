@@ -69,18 +69,23 @@ pub fn post(
 
 const Query = struct {
     query: []const u8,
+    variables: ?[]const u8,
 };
 
 pub fn graphql(
     self: *Self,
     body: []const u8,
+    variables: ?[]const u8,
 ) ![]u8 {
     var arena = std.heap.ArenaAllocator.init(self.arena.allocator());
     defer arena.deinit();
     const allocator = arena.allocator();
     return try self.post(
         "https://api.github.com/graphql",
-        try std.json.Stringify.valueAlloc(allocator, Query{ .query = body }, .{}),
+        try std.json.Stringify.valueAlloc(allocator, Query{
+            .query = body,
+            .variables = variables,
+        }, .{}),
         .{
             .authorization = .{ .override = self.bearer },
             .content_type = .{ .override = "application/json" },
