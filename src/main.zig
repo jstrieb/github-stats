@@ -21,6 +21,34 @@ fn logFn(
     }
 }
 
+fn years(client: *HttpClient) ![]u32 {
+    const response = try client.graphql(
+        \\query {
+        \\  viewer {
+        \\    contributionsCollection {
+        \\      contributionYears
+        \\    }
+        \\  }
+        \\}
+    );
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const r = try std.json.parseFromSliceLeaky(
+        struct { data: struct { viewer: struct {
+            contributionsCollection: struct {
+                contributionYears: []u32,
+            },
+        } } },
+        arena.allocator(),
+        response,
+        .{ .ignore_unknown_fields = true },
+    );
+    return try allocator.dupe(
+        u32,
+        r.data.viewer.contributionsCollection.contributionYears,
+    );
+}
+
 pub fn main() !void {
     var gpa: std.heap.GeneralPurposeAllocator(.{}) = .init;
     defer _ = gpa.deinit();
@@ -29,18 +57,14 @@ pub fn main() !void {
     // TODO: Parse environment variables
     // TODO: Parse CLI flags
 
-    var client: HttpClient = try .init(allocator);
+    var client: HttpClient = try .init(
+        allocator,
+        "TODO",
+    );
     defer client.deinit();
-    std.log.debug("{s}\n", .{
-        try client.get("https://jstrieb.github.io", .{}),
-    });
-    std.log.debug("{s}\n", .{
-        try client.post(
-            "https://httpbin.org/post",
-            "{\"a\": 10, \"b\": [ 1, 2, 3 ]}",
-            .{ .content_type = .{ .override = "application/json" } },
-        ),
-    });
+    const y = try years(&client);
+    defer allocator.free(y);
+    std.debug.print("{any}\n", .{y});
 
     // TODO: Download statistics to populate data structures
     // TODO: Output images from templates

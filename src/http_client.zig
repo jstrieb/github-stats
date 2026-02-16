@@ -7,10 +7,11 @@ const std = @import("std");
 gpa: std.mem.Allocator,
 arena: *std.heap.ArenaAllocator,
 client: std.http.Client,
+bearer: []const u8,
 
 const Self = @This();
 
-pub fn init(allocator: std.mem.Allocator) !Self {
+pub fn init(allocator: std.mem.Allocator, token: []const u8) !Self {
     const arena = try allocator.create(std.heap.ArenaAllocator);
     arena.* = std.heap.ArenaAllocator.init(allocator);
     const a = arena.allocator();
@@ -18,6 +19,7 @@ pub fn init(allocator: std.mem.Allocator) !Self {
         .gpa = allocator,
         .arena = arena,
         .client = .{ .allocator = a },
+        .bearer = try std.fmt.allocPrint(a, "Bearer {s}", .{token}),
     };
 }
 
@@ -63,4 +65,25 @@ pub fn post(
         .headers = headers,
     });
     return try writer.toOwnedSlice();
+}
+
+const Query = struct {
+    query: []const u8,
+};
+
+pub fn graphql(
+    self: *Self,
+    body: []const u8,
+) ![]u8 {
+    var arena = std.heap.ArenaAllocator.init(self.arena.allocator());
+    defer arena.deinit();
+    const allocator = arena.allocator();
+    return try self.post(
+        "https://api.github.com/graphql",
+        try std.json.Stringify.valueAlloc(allocator, Query{ .query = body }, .{}),
+        .{
+            .authorization = .{ .override = self.bearer },
+            .content_type = .{ .override = "application/json" },
+        },
+    );
 }
