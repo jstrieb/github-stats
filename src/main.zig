@@ -53,11 +53,49 @@ const Statistics = struct {
     contributions: u32,
     repositories: []Repository,
 
-    pub fn deinit(self: @This()) void {
+    const Self = @This();
+
+    pub const empty = Self{
+        .contributions = 0,
+        .repositories = undefined,
+    };
+
+    pub fn deinit(self: Self) void {
         for (self.repositories) |repository| {
             repository.deinit();
         }
         allocator.free(self.repositories);
+    }
+
+    pub fn years(client: *HttpClient, alloc: std.mem.Allocator) ![]u32 {
+        const response = try client.graphql(
+            \\query {
+            \\  viewer {
+            \\    contributionsCollection {
+            \\      contributionYears
+            \\    }
+            \\  }
+            \\}
+        , null);
+        const parsed = try std.json.parseFromSliceLeaky(
+            struct {
+                data: struct {
+                    viewer: struct {
+                        contributionsCollection: struct {
+                            contributionYears: []u32,
+                        },
+                    },
+                },
+            },
+            alloc,
+            response,
+            .{ .ignore_unknown_fields = true },
+        );
+        return parsed
+            .data
+            .viewer
+            .contributionsCollection
+            .contributionYears;
     }
 };
 
@@ -65,36 +103,13 @@ fn get_repos(client: *HttpClient) !Statistics {
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
 
-    var response = try client.graphql(
-        \\query {
-        \\  viewer {
-        \\    contributionsCollection {
-        \\      contributionYears
-        \\    }
-        \\  }
-        \\}
-    , null);
-    const years = (try std.json.parseFromSliceLeaky(
-        struct { data: struct { viewer: struct {
-            contributionsCollection: struct {
-                contributionYears: []u32,
-            },
-        } } },
-        arena.allocator(),
-        response,
-        .{ .ignore_unknown_fields = true },
-    )).data.viewer.contributionsCollection.contributionYears;
-
-    var result: Statistics = .{
-        .contributions = 0,
-        .repositories = undefined,
-    };
+    var result: Statistics = .empty;
     var repositories: std.ArrayList(Repository) = try .initCapacity(allocator, 32);
     var seen: std.StringHashMap(bool) = .init(arena.allocator());
     defer seen.deinit();
 
-    for (years) |year| {
-        response = try client.graphql(
+    for (try Statistics.years(client, arena.allocator())) |year| {
+        const response = try client.graphql(
             \\query ($from: DateTime, $to: DateTime) {
             \\  viewer {
             \\    contributionsCollection(from: $from, to: $to) {
