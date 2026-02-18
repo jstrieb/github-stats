@@ -10,6 +10,7 @@ client: std.http.Client,
 bearer: []const u8,
 
 const Self = @This();
+const Response = struct { []const u8, std.http.Status };
 
 pub fn init(allocator: std.mem.Allocator, token: []const u8) !Self {
     const arena = try allocator.create(std.heap.ArenaAllocator);
@@ -33,18 +34,20 @@ pub fn get(
     self: *Self,
     url: []const u8,
     headers: std.http.Client.Request.Headers,
-) ![]u8 {
+    extra_headers: []const std.http.Header,
+) !Response {
     var writer = try std.Io.Writer.Allocating.initCapacity(
         self.arena.allocator(),
         1024,
     );
     defer writer.deinit();
-    _ = try self.client.fetch(.{
+    const status = (try self.client.fetch(.{
         .location = .{ .url = url },
         .response_writer = &writer.writer,
         .headers = headers,
-    });
-    return try writer.toOwnedSlice();
+        .extra_headers = extra_headers,
+    })).status;
+    return .{ try writer.toOwnedSlice(), status };
 }
 
 pub fn post(
@@ -52,19 +55,19 @@ pub fn post(
     url: []const u8,
     body: []const u8,
     headers: std.http.Client.Request.Headers,
-) ![]u8 {
+) !Response {
     var writer = try std.Io.Writer.Allocating.initCapacity(
         self.arena.allocator(),
         1024,
     );
     defer writer.deinit();
-    _ = try self.client.fetch(.{
+    const status = (try self.client.fetch(.{
         .location = .{ .url = url },
         .response_writer = &writer.writer,
         .payload = body,
         .headers = headers,
-    });
-    return try writer.toOwnedSlice();
+    })).status;
+    return .{ try writer.toOwnedSlice(), status };
 }
 
 const Query = struct {
@@ -76,7 +79,7 @@ pub fn graphql(
     self: *Self,
     body: []const u8,
     variables: ?[]const u8,
-) ![]u8 {
+) !Response {
     var arena = std.heap.ArenaAllocator.init(self.arena.allocator());
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -90,5 +93,19 @@ pub fn graphql(
             .authorization = .{ .override = self.bearer },
             .content_type = .{ .override = "application/json" },
         },
+    );
+}
+
+pub fn rest(
+    self: *Self,
+    url: []const u8,
+) !Response {
+    return try self.get(
+        url,
+        .{
+            .authorization = .{ .override = self.bearer },
+            .content_type = .{ .override = "application/json" },
+        },
+        &.{.{ .name = "X-GitHub-Api-Version", .value = "2022-11-28" }},
     );
 }

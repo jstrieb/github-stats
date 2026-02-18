@@ -37,6 +37,7 @@ const Repository = struct {
     stars: u32,
     forks: u32,
     languages: ?[]Language,
+    views: u32,
 
     pub fn deinit(self: @This()) void {
         allocator.free(self.name);
@@ -68,7 +69,7 @@ const Statistics = struct {
     }
 
     pub fn years(client: *HttpClient, alloc: std.mem.Allocator) ![]u32 {
-        const response = try client.graphql(
+        const response, const status = try client.graphql(
             \\query {
             \\  viewer {
             \\    contributionsCollection {
@@ -77,6 +78,7 @@ const Statistics = struct {
             \\  }
             \\}
         , null);
+        if (status != .ok) return error.RequestFailed;
         const parsed = try std.json.parseFromSliceLeaky(
             struct {
                 data: struct {
@@ -104,12 +106,13 @@ fn get_repos(client: *HttpClient) !Statistics {
     defer arena.deinit();
 
     var result: Statistics = .empty;
-    var repositories: std.ArrayList(Repository) = try .initCapacity(allocator, 32);
+    var repositories: std.ArrayList(Repository) =
+        try .initCapacity(allocator, 32);
     var seen: std.StringHashMap(bool) = .init(arena.allocator());
     defer seen.deinit();
 
     for (try Statistics.years(client, arena.allocator())) |year| {
-        const response = try client.graphql(
+        var response, var status = try client.graphql(
             \\query ($from: DateTime, $to: DateTime) {
             \\  viewer {
             \\    contributionsCollection(from: $from, to: $to) {
@@ -123,7 +126,10 @@ fn get_repos(client: *HttpClient) !Statistics {
             \\          nameWithOwner
             \\          stargazerCount
             \\          forkCount
-            \\          languages(first: 100, orderBy: { direction: DESC, field: SIZE }) {
+            \\          languages(
+            \\              first: 100,
+            \\              orderBy: { direction: DESC, field: SIZE }
+            \\          ) {
             \\            edges {
             \\              size
             \\              node {
@@ -150,6 +156,7 @@ fn get_repos(client: *HttpClient) !Statistics {
                 .{ year, year + 1 },
             ),
         );
+        if (status != .ok) return error.RequestFailed;
         const stats = (try std.json.parseFromSliceLeaky(
             struct { data: struct { viewer: struct {
                 contributionsCollection: struct {
@@ -198,6 +205,7 @@ fn get_repos(client: *HttpClient) !Statistics {
                 .stars = raw_repo.stargazerCount,
                 .forks = raw_repo.forkCount,
                 .languages = null,
+                .views = 0,
             };
             if (raw_repo.languages) |repo_languages| {
                 if (repo_languages.edges) |raw_languages| {
@@ -205,7 +213,10 @@ fn get_repos(client: *HttpClient) !Statistics {
                         Language,
                         raw_languages.len,
                     );
-                    for (raw_languages, repository.languages.?) |raw, *language| {
+                    for (
+                        raw_languages,
+                        repository.languages.?,
+                    ) |raw, *language| {
                         language.* = .{
                             .name = try allocator.dupe(u8, raw.node.name),
                             .size = raw.size,
@@ -217,12 +228,40 @@ fn get_repos(client: *HttpClient) !Statistics {
                     }
                 }
             }
+            response, status = try client.rest(
+                try std.mem.concat(
+                    arena.allocator(),
+                    u8,
+                    &.{
+                        "https://api.github.com/repos/",
+                        raw_repo.nameWithOwner,
+                        "/traffic/views",
+                    },
+                ),
+            );
+            if (status == .ok) {
+                repository.views = (try std.json.parseFromSliceLeaky(
+                    struct { count: u32 },
+                    arena.allocator(),
+                    response,
+                    .{ .ignore_unknown_fields = true },
+                )).count;
+            }
             try repositories.append(allocator, repository);
             try seen.put(raw_repo.nameWithOwner, true);
         }
     }
 
     result.repositories = try repositories.toOwnedSlice(allocator);
+    std.sort.pdq(Repository, result.repositories, {}, struct {
+        pub fn lessThanFn(_: void, lhs: Repository, rhs: Repository) bool {
+            if (rhs.views == lhs.views) {
+                return rhs.stars + rhs.forks < lhs.stars + lhs.forks;
+            }
+            return rhs.views < lhs.views;
+        }
+    }.lessThanFn);
+
     return result;
 }
 
@@ -236,7 +275,7 @@ pub fn main() !void {
 
     var client: HttpClient = try .init(
         allocator,
-        "TODO",
+        "",
     );
     defer client.deinit();
     const stats = try get_repos(&client);
