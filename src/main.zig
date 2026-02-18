@@ -7,7 +7,10 @@ pub const std_options: std.Options = .{
     .logFn = logFn,
 };
 
-var log_level = std.log.default_level;
+var log_level: std.log.Level = switch (builtin.mode) {
+    .Debug => .debug,
+    else => .warn,
+};
 var allocator: std.mem.Allocator = undefined;
 
 fn logFn(
@@ -69,6 +72,7 @@ const Statistics = struct {
     }
 
     pub fn years(client: *HttpClient, alloc: std.mem.Allocator) ![]u32 {
+        std.log.info("Getting contribution years...", .{});
         const response, const status = try client.graphql(
             \\query {
             \\  viewer {
@@ -78,7 +82,10 @@ const Statistics = struct {
             \\  }
             \\}
         , null);
-        if (status != .ok) return error.RequestFailed;
+        if (status != .ok) {
+            std.log.err("Failed to get contribution years ({any})", .{status});
+            return error.RequestFailed;
+        }
         const parsed = try std.json.parseFromSliceLeaky(
             struct {
                 data: struct {
@@ -112,6 +119,7 @@ fn get_repos(client: *HttpClient) !Statistics {
     defer seen.deinit();
 
     for (try Statistics.years(client, arena.allocator())) |year| {
+        std.log.info("Getting data from year {d}...", .{year});
         var response, var status = try client.graphql(
             \\query ($from: DateTime, $to: DateTime) {
             \\  viewer {
@@ -156,7 +164,13 @@ fn get_repos(client: *HttpClient) !Statistics {
                 .{ year, year + 1 },
             ),
         );
-        if (status != .ok) return error.RequestFailed;
+        if (status != .ok) {
+            std.log.err(
+                "Failed to get data from year {d} ({any})",
+                .{ year, status },
+            );
+            return error.RequestFailed;
+        }
         const stats = (try std.json.parseFromSliceLeaky(
             struct { data: struct { viewer: struct {
                 contributionsCollection: struct {
@@ -187,6 +201,10 @@ fn get_repos(client: *HttpClient) !Statistics {
             response,
             .{ .ignore_unknown_fields = true },
         )).data.viewer.contributionsCollection;
+        std.log.info(
+            "Parsed data for {d} total repositories in {d}",
+            .{ stats.commitContributionsByRepository.len, year },
+        );
 
         result.contributions += stats.totalRepositoryContributions;
         result.contributions += stats.totalIssueContributions;
@@ -199,7 +217,13 @@ fn get_repos(client: *HttpClient) !Statistics {
 
         for (stats.commitContributionsByRepository) |x| {
             const raw_repo = x.repository;
-            if (seen.get(raw_repo.nameWithOwner) orelse false) continue;
+            if (seen.get(raw_repo.nameWithOwner) orelse false) {
+                std.log.info(
+                    "Skipping {s} (seen)",
+                    .{raw_repo.nameWithOwner},
+                );
+                continue;
+            }
             var repository = Repository{
                 .name = try allocator.dupe(u8, raw_repo.nameWithOwner),
                 .stars = raw_repo.stargazerCount,
@@ -228,6 +252,10 @@ fn get_repos(client: *HttpClient) !Statistics {
                     }
                 }
             }
+            std.log.info(
+                "Getting views for {s}...",
+                .{raw_repo.nameWithOwner},
+            );
             response, status = try client.rest(
                 try std.mem.concat(
                     arena.allocator(),
@@ -246,6 +274,11 @@ fn get_repos(client: *HttpClient) !Statistics {
                     response,
                     .{ .ignore_unknown_fields = true },
                 )).count;
+            } else {
+                std.log.warn(
+                    "Failed to get views for {s} ({any})",
+                    .{ raw_repo.nameWithOwner, status },
+                );
             }
             try repositories.append(allocator, repository);
             try seen.put(raw_repo.nameWithOwner, true);
