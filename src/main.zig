@@ -12,6 +12,7 @@ var log_level: std.log.Level = switch (builtin.mode) {
     else => .warn,
 };
 var allocator: std.mem.Allocator = undefined;
+var user: []const u8 = undefined;
 
 fn logFn(
     comptime message_level: std.log.Level,
@@ -41,6 +42,7 @@ const Repository = struct {
     forks: u32,
     languages: ?[]Language,
     views: u32,
+    lines_changed: u32,
 
     pub fn deinit(self: @This()) void {
         allocator.free(self.name);
@@ -83,7 +85,10 @@ const Statistics = struct {
             \\}
         , null);
         if (status != .ok) {
-            std.log.err("Failed to get contribution years ({any})", .{status});
+            std.log.err(
+                "Failed to get contribution years ({?s})",
+                .{status.phrase()},
+            );
             return error.RequestFailed;
         }
         const parsed = try std.json.parseFromSliceLeaky(
@@ -119,7 +124,7 @@ fn get_repos(client: *HttpClient) !Statistics {
     defer seen.deinit();
 
     for (try Statistics.years(client, arena.allocator())) |year| {
-        std.log.info("Getting data from year {d}...", .{year});
+        std.log.info("Getting data from {d}...", .{year});
         var response, var status = try client.graphql(
             \\query ($from: DateTime, $to: DateTime) {
             \\  viewer {
@@ -166,8 +171,8 @@ fn get_repos(client: *HttpClient) !Statistics {
         );
         if (status != .ok) {
             std.log.err(
-                "Failed to get data from year {d} ({any})",
-                .{ year, status },
+                "Failed to get data from {d} ({?s})",
+                .{ year, status.phrase() },
             );
             return error.RequestFailed;
         }
@@ -202,7 +207,7 @@ fn get_repos(client: *HttpClient) !Statistics {
             .{ .ignore_unknown_fields = true },
         )).data.viewer.contributionsCollection;
         std.log.info(
-            "Parsed data for {d} total repositories in {d}",
+            "Parsed {d} total repositories from {d}",
             .{ stats.commitContributionsByRepository.len, year },
         );
 
@@ -219,7 +224,7 @@ fn get_repos(client: *HttpClient) !Statistics {
             const raw_repo = x.repository;
             if (seen.get(raw_repo.nameWithOwner) orelse false) {
                 std.log.info(
-                    "Skipping {s} (seen)",
+                    "Skipping view count for {s} (seen)",
                     .{raw_repo.nameWithOwner},
                 );
                 continue;
@@ -230,6 +235,7 @@ fn get_repos(client: *HttpClient) !Statistics {
                 .forks = raw_repo.forkCount,
                 .languages = null,
                 .views = 0,
+                .lines_changed = 0,
             };
             if (raw_repo.languages) |repo_languages| {
                 if (repo_languages.edges) |raw_languages| {
@@ -276,8 +282,8 @@ fn get_repos(client: *HttpClient) !Statistics {
                 )).count;
             } else {
                 std.log.warn(
-                    "Failed to get views for {s} ({any})",
-                    .{ raw_repo.nameWithOwner, status },
+                    "Failed to get views for {s} ({?s})",
+                    .{ raw_repo.nameWithOwner, status.phrase() },
                 );
             }
             try repositories.append(allocator, repository);
@@ -295,6 +301,92 @@ fn get_repos(client: *HttpClient) !Statistics {
         }
     }.lessThanFn);
 
+    const T = struct {
+        repo: *Repository,
+        delay: i64,
+        timestamp: i64,
+    };
+    var q: std.PriorityQueue(T, void, struct {
+        pub fn compareFn(_: void, lhs: T, rhs: T) std.math.Order {
+            return std.math.order(lhs.timestamp, rhs.timestamp);
+        }
+    }.compareFn) = .init(arena.allocator(), {});
+    defer q.deinit();
+    for (result.repositories) |*repo| {
+        try q.add(.{
+            .repo = repo,
+            .delay = 16,
+            .timestamp = std.time.timestamp(),
+        });
+    }
+    while (q.count() > 0) {
+        var item = q.remove();
+        const now = std.time.timestamp();
+        if (item.timestamp > now) {
+            std.Thread.sleep(
+                @as(u64, @intCast(
+                    item.timestamp - now,
+                )) * std.time.ns_per_s,
+            );
+        }
+        std.log.info(
+            "Trying to get lines of code changed for {s}...",
+            .{item.repo.name},
+        );
+        const response, const status = try client.rest(
+            try std.mem.concat(
+                arena.allocator(),
+                u8,
+                &.{
+                    "https://api.github.com/repos/",
+                    item.repo.name,
+                    "/stats/contributors",
+                },
+            ),
+        );
+        switch (status) {
+            .ok => {
+                const authors = (try std.json.parseFromSliceLeaky(
+                    []struct {
+                        author: struct { login: []const u8 },
+                        weeks: []struct {
+                            a: u32,
+                            d: u32,
+                        },
+                    },
+                    arena.allocator(),
+                    response,
+                    .{ .ignore_unknown_fields = true },
+                ));
+                for (authors) |o| {
+                    if (!std.mem.eql(u8, o.author.login, user)) {
+                        continue;
+                    }
+                    for (o.weeks) |week| {
+                        item.repo.lines_changed += week.a;
+                        item.repo.lines_changed += week.d;
+                    }
+                }
+                std.log.info(
+                    "Got {d} lines changed by {s} in {s}",
+                    .{ item.repo.lines_changed, user, item.repo.name },
+                );
+            },
+            .accepted => {
+                item.timestamp = std.time.timestamp() + item.delay;
+                item.delay *= 2;
+                try q.add(item);
+            },
+            else => {
+                std.log.err(
+                    "Failed to get contribution data for {s} ({?s})",
+                    .{ item.repo.name, status.phrase() },
+                );
+                return error.RequestFailed;
+            },
+        }
+    }
+
     return result;
 }
 
@@ -310,12 +402,12 @@ pub fn main() !void {
         allocator,
         "",
     );
+    user = "";
     defer client.deinit();
     const stats = try get_repos(&client);
     defer stats.deinit();
     print(stats);
 
-    // TODO: Download statistics to populate data structures
     // TODO: Output images from templates
 }
 
