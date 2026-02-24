@@ -8,9 +8,11 @@ gpa: std.mem.Allocator,
 arena: *std.heap.ArenaAllocator,
 client: std.http.Client,
 bearer: []const u8,
+last_request: ?i64 = null,
 
 const Self = @This();
 const Response = struct { []const u8, std.http.Status };
+const KEEP_ALIVE_TIMEOUT: i64 = 16;
 
 pub fn init(allocator: std.mem.Allocator, token: []const u8) !Self {
     const arena = try allocator.create(std.heap.ArenaAllocator);
@@ -41,12 +43,20 @@ pub fn get(
         1024,
     );
     defer writer.deinit();
+    const now = std.time.timestamp();
     const status = (try self.client.fetch(.{
         .location = .{ .url = url },
         .response_writer = &writer.writer,
         .headers = headers,
         .extra_headers = extra_headers,
+        // Work around failures from keep alive connections closing after
+        // timeout and not being automatically reopened by Zig
+        .keep_alive = if (self.last_request) |last|
+            now - last > KEEP_ALIVE_TIMEOUT
+        else
+            true,
     })).status;
+    self.last_request = now;
     return .{ try writer.toOwnedSlice(), status };
 }
 
@@ -61,12 +71,20 @@ pub fn post(
         1024,
     );
     defer writer.deinit();
+    const now = std.time.timestamp();
     const status = (try self.client.fetch(.{
         .location = .{ .url = url },
         .response_writer = &writer.writer,
         .payload = body,
         .headers = headers,
+        // Work around failures from keep alive connections closing after
+        // timeout and not being automatically reopened by Zig
+        .keep_alive = if (self.last_request) |last|
+            now - last > KEEP_ALIVE_TIMEOUT
+        else
+            true,
     })).status;
+    self.last_request = now;
     return .{ try writer.toOwnedSlice(), status };
 }
 
