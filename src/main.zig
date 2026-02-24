@@ -56,21 +56,18 @@ const Repository = struct {
 };
 
 const Statistics = struct {
-    contributions: u32,
-    repositories: []Repository,
+    contributions: u32 = 0,
+    repositories: ?[]Repository = null,
 
     const Self = @This();
 
-    pub const empty = Self{
-        .contributions = 0,
-        .repositories = undefined,
-    };
-
     pub fn deinit(self: Self) void {
-        for (self.repositories) |repository| {
-            repository.deinit();
+        if (self.repositories) |repositories| {
+            for (repositories) |repository| {
+                repository.deinit();
+            }
+            allocator.free(repositories);
         }
-        allocator.free(self.repositories);
     }
 
     pub fn years(client: *HttpClient, alloc: std.mem.Allocator) ![]u32 {
@@ -117,9 +114,19 @@ fn get_repos(client: *HttpClient) !Statistics {
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
 
-    var result: Statistics = .empty;
+    var result: Statistics = .{};
     var repositories: std.ArrayList(Repository) =
         try .initCapacity(allocator, 32);
+    errdefer {
+        if (result.repositories) |_| {
+            result.deinit();
+        } else {
+            for (repositories.items) |repo| {
+                repo.deinit();
+            }
+            repositories.deinit(allocator);
+        }
+    }
     var seen: std.StringHashMap(bool) = .init(arena.allocator());
     defer seen.deinit();
 
@@ -292,7 +299,7 @@ fn get_repos(client: *HttpClient) !Statistics {
     }
 
     result.repositories = try repositories.toOwnedSlice(allocator);
-    std.sort.pdq(Repository, result.repositories, {}, struct {
+    std.sort.pdq(Repository, result.repositories.?, {}, struct {
         pub fn lessThanFn(_: void, lhs: Repository, rhs: Repository) bool {
             if (rhs.views == lhs.views) {
                 return rhs.stars + rhs.forks < lhs.stars + lhs.forks;
@@ -312,7 +319,7 @@ fn get_repos(client: *HttpClient) !Statistics {
         }
     }.compareFn) = .init(arena.allocator(), {});
     defer q.deinit();
-    for (result.repositories) |*repo| {
+    for (result.repositories.?) |*repo| {
         try q.add(.{
             .repo = repo,
             .delay = 16,
