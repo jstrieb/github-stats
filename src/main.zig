@@ -322,7 +322,7 @@ fn get_repos(client: *HttpClient) !Statistics {
     for (result.repositories.?) |*repo| {
         try q.add(.{
             .repo = repo,
-            .delay = 16,
+            .delay = 2,
             .timestamp = std.time.timestamp(),
         });
     }
@@ -330,6 +330,10 @@ fn get_repos(client: *HttpClient) !Statistics {
         var item = q.remove();
         const now = std.time.timestamp();
         if (item.timestamp > now) {
+            std.log.debug("Sleeping for {d}s. Waiting for {d} repos.", .{
+                item.timestamp - now,
+                q.count() + 1,
+            });
             std.Thread.sleep(
                 @as(u64, @intCast(
                     item.timestamp - now,
@@ -381,7 +385,8 @@ fn get_repos(client: *HttpClient) !Statistics {
             },
             .accepted => {
                 item.timestamp = std.time.timestamp() + item.delay;
-                item.delay *= 2;
+                const _delay: f64 = @floatFromInt(item.delay);
+                item.delay = @intFromFloat(_delay * 1.5);
                 try q.add(item);
             },
             else => {
