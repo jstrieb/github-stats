@@ -56,18 +56,16 @@ const Repository = struct {
 };
 
 const Statistics = struct {
+    repositories: []Repository,
     contributions: u32 = 0,
-    repositories: ?[]Repository = null,
 
     const Self = @This();
 
     pub fn deinit(self: Self) void {
-        if (self.repositories) |repositories| {
-            for (repositories) |repository| {
-                repository.deinit();
-            }
-            allocator.free(repositories);
+        for (self.repositories) |repository| {
+            repository.deinit();
         }
+        allocator.free(self.repositories);
     }
 
     pub fn years(client: *HttpClient, alloc: std.mem.Allocator) ![]u32 {
@@ -110,22 +108,18 @@ const Statistics = struct {
     }
 };
 
-fn get_repos(client: *HttpClient) !Statistics {
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-
-    var result: Statistics = .{};
+fn repo_list(
+    arena: *std.heap.ArenaAllocator,
+    client: *HttpClient,
+) !struct { u32, []Repository } {
+    var contributions: u32 = 0;
     var repositories: std.ArrayList(Repository) =
         try .initCapacity(allocator, 32);
     errdefer {
-        if (result.repositories) |_| {
-            result.deinit();
-        } else {
-            for (repositories.items) |repo| {
-                repo.deinit();
-            }
-            repositories.deinit(allocator);
+        for (repositories.items) |repo| {
+            repo.deinit();
         }
+        repositories.deinit(allocator);
     }
     var seen: std.StringHashMap(bool) = .init(arena.allocator());
     defer seen.deinit();
@@ -218,11 +212,11 @@ fn get_repos(client: *HttpClient) !Statistics {
             .{ stats.commitContributionsByRepository.len, year },
         );
 
-        result.contributions += stats.totalRepositoryContributions;
-        result.contributions += stats.totalIssueContributions;
-        result.contributions += stats.totalCommitContributions;
-        result.contributions += stats.totalPullRequestContributions;
-        result.contributions += stats.totalPullRequestReviewContributions;
+        contributions += stats.totalRepositoryContributions;
+        contributions += stats.totalIssueContributions;
+        contributions += stats.totalCommitContributions;
+        contributions += stats.totalPullRequestContributions;
+        contributions += stats.totalPullRequestReviewContributions;
 
         // TODO: if there are 100 ore more repositories, we should subdivide
         // the date range in half
@@ -288,7 +282,7 @@ fn get_repos(client: *HttpClient) !Statistics {
                     .{ .ignore_unknown_fields = true },
                 )).count;
             } else {
-                std.log.warn(
+                std.log.info(
                     "Failed to get views for {s} ({?s})",
                     .{ raw_repo.nameWithOwner, status.phrase() },
                 );
@@ -298,8 +292,8 @@ fn get_repos(client: *HttpClient) !Statistics {
         }
     }
 
-    result.repositories = try repositories.toOwnedSlice(allocator);
-    std.sort.pdq(Repository, result.repositories.?, {}, struct {
+    const list = try repositories.toOwnedSlice(allocator);
+    std.sort.pdq(Repository, list, {}, struct {
         pub fn lessThanFn(_: void, lhs: Repository, rhs: Repository) bool {
             if (rhs.views == lhs.views) {
                 return rhs.stars + rhs.forks < lhs.stars + lhs.forks;
@@ -307,6 +301,17 @@ fn get_repos(client: *HttpClient) !Statistics {
             return rhs.views < lhs.views;
         }
     }.lessThanFn);
+
+    return .{ contributions, list };
+}
+
+fn get_repos(client: *HttpClient) !Statistics {
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+
+    var result: Statistics = .{ .repositories = undefined };
+    result.contributions, result.repositories = try repo_list(&arena, client);
+    errdefer result.deinit();
 
     const T = struct {
         repo: *Repository,
@@ -319,7 +324,7 @@ fn get_repos(client: *HttpClient) !Statistics {
         }
     }.compareFn) = .init(arena.allocator(), {});
     defer q.deinit();
-    for (result.repositories.?) |*repo| {
+    for (result.repositories) |*repo| {
         try q.add(.{
             .repo = repo,
             .delay = 2,
@@ -330,15 +335,12 @@ fn get_repos(client: *HttpClient) !Statistics {
         var item = q.remove();
         const now = std.time.timestamp();
         if (item.timestamp > now) {
+            const delay: u64 = @intCast(item.timestamp - now);
             std.log.debug("Sleeping for {d}s. Waiting for {d} repos.", .{
-                item.timestamp - now,
+                delay,
                 q.count() + 1,
             });
-            std.Thread.sleep(
-                @as(u64, @intCast(
-                    item.timestamp - now,
-                )) * std.time.ns_per_s,
-            );
+            std.Thread.sleep(delay * std.time.ns_per_s);
         }
         std.log.info(
             "Trying to get lines of code changed for {s}...",
@@ -385,8 +387,8 @@ fn get_repos(client: *HttpClient) !Statistics {
             },
             .accepted => {
                 item.timestamp = std.time.timestamp() + item.delay;
-                const _delay: f64 = @floatFromInt(item.delay);
-                item.delay = @intFromFloat(_delay * 1.5);
+                const old_delay: f64 = @floatFromInt(item.delay);
+                item.delay = @intFromFloat(old_delay * 1.5);
                 try q.add(item);
             },
             else => {
