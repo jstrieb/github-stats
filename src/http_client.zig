@@ -12,7 +12,6 @@ last_request: ?i64 = null,
 
 const Self = @This();
 const Response = struct { []const u8, std.http.Status };
-const KEEP_ALIVE_TIMEOUT: i64 = 16;
 
 pub fn init(allocator: std.mem.Allocator, token: []const u8) !Self {
     const arena = try allocator.create(std.heap.ArenaAllocator);
@@ -44,17 +43,27 @@ pub fn get(
     );
     defer writer.deinit();
     const now = std.time.timestamp();
-    const status = (try self.client.fetch(.{
+    const status = (try (self.client.fetch(.{
         .location = .{ .url = url },
         .response_writer = &writer.writer,
         .headers = headers,
         .extra_headers = extra_headers,
-        // Work around failures from keep alive connections closing after
-        // timeout and not being automatically reopened by Zig
-        .keep_alive = if (self.last_request) |last|
-            now - last > KEEP_ALIVE_TIMEOUT
-        else
-            true,
+    }) catch |err| switch (err) {
+        error.HttpConnectionClosing => {
+            // Handle a Zig HTTP bug where keep-alive connections are closed by
+            // the server after a timeout, but the client doesn't handle it
+            // properly. For now we nuke the whole client (and associate
+            // connection pool) and make a new one, but there might be a better
+            // way to handle this.
+            std.log.debug(
+                "Keep alive connection closed. Initializing a new client.",
+                .{},
+            );
+            self.client.deinit();
+            self.client = .{ .allocator = self.arena.allocator() };
+            return self.get(url, headers, extra_headers);
+        },
+        else => err,
     })).status;
     self.last_request = now;
     return .{ try writer.toOwnedSlice(), status };
@@ -72,17 +81,27 @@ pub fn post(
     );
     defer writer.deinit();
     const now = std.time.timestamp();
-    const status = (try self.client.fetch(.{
+    const status = (try (self.client.fetch(.{
         .location = .{ .url = url },
         .response_writer = &writer.writer,
         .payload = body,
         .headers = headers,
-        // Work around failures from keep alive connections closing after
-        // timeout and not being automatically reopened by Zig
-        .keep_alive = if (self.last_request) |last|
-            now - last > KEEP_ALIVE_TIMEOUT
-        else
-            true,
+    }) catch |err| switch (err) {
+        error.HttpConnectionClosing => {
+            // Handle a Zig HTTP bug where keep-alive connections are closed by
+            // the server after a timeout, but the client doesn't handle it
+            // properly. For now we nuke the whole client (and associate
+            // connection pool) and make a new one, but there might be a better
+            // way to handle this.
+            std.log.debug(
+                "Keep alive connection closed. Initializing a new client.",
+                .{},
+            );
+            self.client.deinit();
+            self.client = .{ .allocator = self.arena.allocator() };
+            return self.post(url, body, headers);
+        },
+        else => err,
     })).status;
     self.last_request = now;
     return .{ try writer.toOwnedSlice(), status };

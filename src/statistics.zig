@@ -199,7 +199,7 @@ fn repo_list(
         for (stats.commitContributionsByRepository) |x| {
             const raw_repo = x.repository;
             if (seen.get(raw_repo.nameWithOwner) orelse false) {
-                std.log.info(
+                std.log.debug(
                     "Skipping view count for {s} (seen)",
                     .{raw_repo.nameWithOwner},
                 );
@@ -307,7 +307,7 @@ pub fn init(
     for (result.repositories) |*repo| {
         try q.add(.{
             .repo = repo,
-            .delay = 2,
+            .delay = 8,
             .timestamp = std.time.timestamp(),
         });
     }
@@ -370,7 +370,7 @@ pub fn init(
                 // Exponential backoff (in expectation) with jitter
                 item.delay += std.crypto.random.intRangeAtMost(
                     i64,
-                    1,
+                    2,
                     item.delay,
                 );
                 try q.add(item);
