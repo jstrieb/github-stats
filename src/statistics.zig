@@ -36,6 +36,62 @@ const Repository = struct {
             allocator.free(languages);
         }
     }
+
+    pub fn get_lines_changed(
+        self: *@This(),
+        arena: *std.heap.ArenaAllocator,
+        client: *HttpClient,
+        user: []const u8,
+    ) !std.http.Status {
+        std.log.debug(
+            "Trying to get lines of code changed for {s}...",
+            .{self.name},
+        );
+        const response, const status = try client.rest(
+            try std.mem.concat(
+                arena.allocator(),
+                u8,
+                &.{
+                    "https://api.github.com/repos/",
+                    self.name,
+                    "/stats/contributors",
+                },
+            ),
+        );
+        if (status == .ok) {
+            const authors = (try std.json.parseFromSliceLeaky(
+                []struct {
+                    author: struct { login: []const u8 },
+                    weeks: []struct {
+                        a: u32,
+                        d: u32,
+                    },
+                },
+                arena.allocator(),
+                response,
+                .{ .ignore_unknown_fields = true },
+            ));
+            for (authors) |o| {
+                if (!std.mem.eql(u8, o.author.login, user)) {
+                    continue;
+                }
+                for (o.weeks) |week| {
+                    self.lines_changed += week.a;
+                    self.lines_changed += week.d;
+                }
+            }
+            std.log.info(
+                "Got {d} line{s} changed by {s} in {s}",
+                .{
+                    self.lines_changed,
+                    if (self.lines_changed != 1) "s" else "",
+                    user,
+                    self.name,
+                },
+            );
+        }
+        return status;
+    }
 };
 
 pub fn init(client: *HttpClient, a: std.mem.Allocator) !Statistics {
@@ -214,7 +270,7 @@ fn get_repos(
             const raw_repo = x.repository;
             if (seen.get(raw_repo.nameWithOwner) orelse false) {
                 std.log.debug(
-                    "Skipping view count for {s} (seen)",
+                    "Skipping {s} (seen)",
                     .{raw_repo.nameWithOwner},
                 );
                 continue;
@@ -227,6 +283,7 @@ fn get_repos(
                 .views = 0,
                 .lines_changed = 0,
             };
+
             if (raw_repo.languages) |repo_languages| {
                 if (repo_languages.edges) |raw_languages| {
                     repository.languages = try allocator.alloc(
@@ -249,6 +306,8 @@ fn get_repos(
                     }
                 }
             }
+            errdefer repository.deinit();
+
             std.log.info(
                 "Getting views for {s}...",
                 .{raw_repo.nameWithOwner},
@@ -277,6 +336,9 @@ fn get_repos(
                     .{ raw_repo.nameWithOwner, status.phrase() },
                 );
             }
+
+            _ = try repository.get_lines_changed(arena, client, user);
+
             try repositories.append(allocator, repository);
             try seen.put(raw_repo.nameWithOwner, true);
         }
@@ -316,6 +378,9 @@ fn get_lines_changed(
     }.compareFn) = .init(arena.allocator(), {});
     defer q.deinit();
     for (self.repositories) |*repo| {
+        if (repo.lines_changed > 0) {
+            continue;
+        }
         try q.add(.{
             .repo = repo,
             .delay = 8,
@@ -334,65 +399,16 @@ fn get_lines_changed(
             });
             std.Thread.sleep(delay * std.time.ns_per_s);
         }
-        std.log.info(
-            "Trying to get lines of code changed for {s}...",
-            .{item.repo.name},
-        );
-        const response, const status = try client.rest(
-            try std.mem.concat(
-                arena.allocator(),
-                u8,
-                &.{
-                    "https://api.github.com/repos/",
-                    item.repo.name,
-                    "/stats/contributors",
-                },
-            ),
-        );
-        switch (status) {
-            .ok => {
-                const authors = (try std.json.parseFromSliceLeaky(
-                    []struct {
-                        author: struct { login: []const u8 },
-                        weeks: []struct {
-                            a: u32,
-                            d: u32,
-                        },
-                    },
-                    arena.allocator(),
-                    response,
-                    .{ .ignore_unknown_fields = true },
-                ));
-                for (authors) |o| {
-                    if (!std.mem.eql(u8, o.author.login, self.user)) {
-                        continue;
-                    }
-                    for (o.weeks) |week| {
-                        item.repo.lines_changed += week.a;
-                        item.repo.lines_changed += week.d;
-                    }
-                }
-                std.log.info(
-                    "Got {d} line{s} changed by {s} in {s}",
-                    .{
-                        item.repo.lines_changed,
-                        if (item.repo.lines_changed != 1) "s" else "",
-                        self.user,
-                        item.repo.name,
-                    },
-                );
-            },
+        switch (try item.repo.get_lines_changed(arena, client, self.user)) {
+            .ok => {},
             .accepted => {
                 item.timestamp = std.time.timestamp() + item.delay;
                 // Exponential backoff (in expectation) with jitter
-                item.delay += std.crypto.random.intRangeAtMost(
-                    i64,
-                    2,
-                    item.delay,
-                );
+                item.delay +=
+                    std.crypto.random.intRangeAtMost(i64, 2, item.delay);
                 try q.add(item);
             },
-            else => {
+            else => |status| {
                 std.log.err(
                     "Failed to get contribution data for {s} ({?s})",
                     .{ item.repo.name, status.phrase() },
