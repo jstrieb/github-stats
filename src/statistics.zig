@@ -367,8 +367,12 @@ pub fn init(
             },
             .accepted => {
                 item.timestamp = std.time.timestamp() + item.delay;
-                const old_delay: f64 = @floatFromInt(item.delay);
-                item.delay = @intFromFloat(old_delay * 1.5);
+                // Exponential backoff (in expectation) with jitter
+                item.delay += std.crypto.random.intRangeAtMost(
+                    i64,
+                    1,
+                    item.delay,
+                );
                 try q.add(item);
             },
             else => {
