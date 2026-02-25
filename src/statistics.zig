@@ -2,6 +2,7 @@ const std = @import("std");
 const HttpClient = @import("http_client.zig");
 
 repositories: []Repository,
+user: []const u8,
 contributions: u32 = 0,
 
 var allocator: std.mem.Allocator = undefined;
@@ -37,11 +38,23 @@ const Repository = struct {
     }
 };
 
+pub fn init(client: *HttpClient, a: std.mem.Allocator) !Statistics {
+    allocator = a;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+
+    var self: Statistics = try get_repos(&arena, client);
+    errdefer self.deinit();
+    try self.get_lines_changed(&arena, client);
+    return self;
+}
+
 pub fn deinit(self: Statistics) void {
     for (self.repositories) |repository| {
         repository.deinit();
     }
     allocator.free(self.repositories);
+    allocator.free(self.user);
 }
 
 fn years(client: *HttpClient, alloc: std.mem.Allocator) ![]u32 {
@@ -63,15 +76,11 @@ fn years(client: *HttpClient, alloc: std.mem.Allocator) ![]u32 {
         return error.RequestFailed;
     }
     const parsed = try std.json.parseFromSliceLeaky(
-        struct {
-            data: struct {
-                viewer: struct {
-                    contributionsCollection: struct {
-                        contributionYears: []u32,
-                    },
-                },
+        struct { data: struct { viewer: struct {
+            contributionsCollection: struct {
+                contributionYears: []u32,
             },
-        },
+        } } },
         alloc,
         response,
         .{ .ignore_unknown_fields = true },
@@ -83,11 +92,12 @@ fn years(client: *HttpClient, alloc: std.mem.Allocator) ![]u32 {
         .contributionYears;
 }
 
-fn repo_list(
+fn get_repos(
     arena: *std.heap.ArenaAllocator,
     client: *HttpClient,
-) !struct { u32, []Repository } {
+) !Statistics {
     var contributions: u32 = 0;
+    var user: []const u8 = undefined;
     var repositories: std.ArrayList(Repository) =
         try .initCapacity(allocator, 32);
     errdefer {
@@ -104,6 +114,7 @@ fn repo_list(
         var response, var status = try client.graphql(
             \\query ($from: DateTime, $to: DateTime) {
             \\  viewer {
+            \\    login
             \\    contributionsCollection(from: $from, to: $to) {
             \\      totalRepositoryContributions
             \\      totalIssueContributions
@@ -152,8 +163,9 @@ fn repo_list(
             );
             return error.RequestFailed;
         }
-        const stats = (try std.json.parseFromSliceLeaky(
+        const viewer = (try std.json.parseFromSliceLeaky(
             struct { data: struct { viewer: struct {
+                login: []const u8,
                 contributionsCollection: struct {
                     totalRepositoryContributions: u32,
                     totalIssueContributions: u32,
@@ -181,7 +193,9 @@ fn repo_list(
             arena.allocator(),
             response,
             .{ .ignore_unknown_fields = true },
-        )).data.viewer.contributionsCollection;
+        )).data.viewer;
+        user = viewer.login;
+        const stats = viewer.contributionsCollection;
         std.log.info(
             "Parsed {d} total repositories from {d}",
             .{ stats.commitContributionsByRepository.len, year },
@@ -226,6 +240,7 @@ fn repo_list(
                         language.* = .{
                             .name = try allocator.dupe(u8, raw.node.name),
                             .size = raw.size,
+                            // TODO: Add sensible default color
                             .color = "",
                         };
                         if (raw.node.color) |color| {
@@ -277,22 +292,18 @@ fn repo_list(
         }
     }.lessThanFn);
 
-    return .{ contributions, list };
+    return .{
+        .contributions = contributions,
+        .user = try allocator.dupe(u8, user),
+        .repositories = list,
+    };
 }
 
-pub fn init(
+fn get_lines_changed(
+    self: *Statistics,
+    arena: *std.heap.ArenaAllocator,
     client: *HttpClient,
-    user: []const u8,
-    alloc: std.mem.Allocator,
-) !Statistics {
-    allocator = alloc;
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-
-    var result: Statistics = .{ .repositories = undefined };
-    result.contributions, result.repositories = try repo_list(&arena, client);
-    errdefer result.deinit();
-
+) !void {
     const T = struct {
         repo: *Repository,
         delay: i64,
@@ -304,7 +315,7 @@ pub fn init(
         }
     }.compareFn) = .init(arena.allocator(), {});
     defer q.deinit();
-    for (result.repositories) |*repo| {
+    for (self.repositories) |*repo| {
         try q.add(.{
             .repo = repo,
             .delay = 8,
@@ -316,9 +327,10 @@ pub fn init(
         const now = std.time.timestamp();
         if (item.timestamp > now) {
             const delay: u64 = @intCast(item.timestamp - now);
-            std.log.debug("Sleeping for {d}s. Waiting for {d} repos.", .{
+            std.log.debug("Sleeping for {d}s. Waiting for {d} repo{s}.", .{
                 delay,
                 q.count() + 1,
+                if (q.count() != 0) "s" else "",
             });
             std.Thread.sleep(delay * std.time.ns_per_s);
         }
@@ -352,7 +364,7 @@ pub fn init(
                     .{ .ignore_unknown_fields = true },
                 ));
                 for (authors) |o| {
-                    if (!std.mem.eql(u8, o.author.login, user)) {
+                    if (!std.mem.eql(u8, o.author.login, self.user)) {
                         continue;
                     }
                     for (o.weeks) |week| {
@@ -361,8 +373,13 @@ pub fn init(
                     }
                 }
                 std.log.info(
-                    "Got {d} lines changed by {s} in {s}",
-                    .{ item.repo.lines_changed, user, item.repo.name },
+                    "Got {d} line{s} changed by {s} in {s}",
+                    .{
+                        item.repo.lines_changed,
+                        if (item.repo.lines_changed != 1) "s" else "",
+                        self.user,
+                        item.repo.name,
+                    },
                 );
             },
             .accepted => {
@@ -384,6 +401,4 @@ pub fn init(
             },
         }
     }
-
-    return result;
 }

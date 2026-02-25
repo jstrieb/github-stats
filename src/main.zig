@@ -38,9 +38,8 @@ pub fn main() !void {
         allocator,
         "",
     );
-    user = "";
     defer client.deinit();
-    const stats = try Statistics.init(&client, user, allocator);
+    const stats = try Statistics.init(&client, allocator);
     defer stats.deinit();
     print(stats);
 
