@@ -1,5 +1,6 @@
 const builtin = @import("builtin");
 const std = @import("std");
+const argparse = @import("argparse.zig");
 
 const HttpClient = @import("http_client.zig");
 const Statistics = @import("statistics.zig");
@@ -26,18 +27,23 @@ fn logFn(
     }
 }
 
+const Args = struct {
+    api_key: []const u8,
+
+    pub fn deinit(self: @This()) void {
+        allocator.free(self.api_key);
+    }
+};
+
 pub fn main() !void {
     var gpa: std.heap.GeneralPurposeAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     allocator = gpa.allocator();
 
-    // TODO: Parse environment variables
-    // TODO: Parse CLI flags
+    const args = try argparse.parse(allocator, Args);
+    defer args.deinit();
 
-    var client: HttpClient = try .init(
-        allocator,
-        "",
-    );
+    var client: HttpClient = try .init(allocator, args.api_key);
     defer client.deinit();
     const stats = try Statistics.init(&client, allocator);
     defer stats.deinit();
