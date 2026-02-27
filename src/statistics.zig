@@ -113,11 +113,15 @@ pub fn deinit(self: Statistics) void {
     allocator.free(self.user);
 }
 
-fn years(client: *HttpClient, alloc: std.mem.Allocator) ![]u32 {
+fn get_years(
+    client: *HttpClient,
+    alloc: std.mem.Allocator,
+) !struct { []u32, []const u8 } {
     std.log.info("Getting contribution years...", .{});
     const response, const status = try client.graphql(
         \\query {
         \\  viewer {
+        \\    login
         \\    contributionsCollection {
         \\      contributionYears
         \\    }
@@ -131,8 +135,9 @@ fn years(client: *HttpClient, alloc: std.mem.Allocator) ![]u32 {
         );
         return error.RequestFailed;
     }
-    const parsed = try std.json.parseFromSliceLeaky(
+    const parsed = (try std.json.parseFromSliceLeaky(
         struct { data: struct { viewer: struct {
+            login: []const u8,
             contributionsCollection: struct {
                 contributionYears: []u32,
             },
@@ -140,12 +145,8 @@ fn years(client: *HttpClient, alloc: std.mem.Allocator) ![]u32 {
         alloc,
         response,
         .{ .ignore_unknown_fields = true },
-    );
-    return parsed
-        .data
-        .viewer
-        .contributionsCollection
-        .contributionYears;
+    )).data.viewer;
+    return .{ parsed.contributionsCollection.contributionYears, parsed.login };
 }
 
 fn get_repos(
@@ -153,7 +154,6 @@ fn get_repos(
     client: *HttpClient,
 ) !Statistics {
     var contributions: u32 = 0;
-    var user: []const u8 = undefined;
     var repositories: std.ArrayList(Repository) =
         try .initCapacity(allocator, 32);
     errdefer {
@@ -165,12 +165,13 @@ fn get_repos(
     var seen: std.StringHashMap(bool) = .init(arena.allocator());
     defer seen.deinit();
 
-    for (try Statistics.years(client, arena.allocator())) |year| {
+    const years, const user = try get_years(client, arena.allocator());
+    std.log.info("Getting data for user {s}...", .{user});
+    for (years) |year| {
         std.log.info("Getting data from {d}...", .{year});
         var response, var status = try client.graphql(
             \\query ($from: DateTime, $to: DateTime) {
             \\  viewer {
-            \\    login
             \\    contributionsCollection(from: $from, to: $to) {
             \\      totalRepositoryContributions
             \\      totalIssueContributions
@@ -221,7 +222,6 @@ fn get_repos(
         }
         const viewer = (try std.json.parseFromSliceLeaky(
             struct { data: struct { viewer: struct {
-                login: []const u8,
                 contributionsCollection: struct {
                     totalRepositoryContributions: u32,
                     totalIssueContributions: u32,
@@ -250,7 +250,7 @@ fn get_repos(
             response,
             .{ .ignore_unknown_fields = true },
         )).data.viewer;
-        user = viewer.login;
+
         const stats = viewer.contributionsCollection;
         std.log.info(
             "Parsed {d} total repositories from {d}",
