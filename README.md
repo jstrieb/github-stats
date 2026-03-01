@@ -83,6 +83,8 @@ For more information on inaccuracies, see issue
    newly-created repository and go to the "Secrets" page (bottom left).
 4. Create a new secret with the name `ACCESS_TOKEN` and paste the copied
    personal access token as the value.
+   -  If personal access token is not generated, then go to [tokens](https://github.com/settings/tokens) and 
+      click on Generate new token to generate a new token and use it.
 5. It is possible to change the type of statistics reported by adding other
    repository secrets. 
    - To ignore certain repos, add them (in owner/name format e.g.,
@@ -93,15 +95,13 @@ For more information on inaccuracies, see issue
      could set the value to `html,tex`.
    - To show statistics only for "owned" repositories and not forks with
      contributions, add an environment variable (under the `env` header in the
-     [main
-     workflow](https://github.com/jstrieb/github-stats/blob/master/.github/workflows/main.yml))
+     [main workflow](https://github.com/jstrieb/github-stats/blob/master/.github/workflows/main.yml))
      called `EXCLUDE_FORKED_REPOS` with a value of `true`.
    - These other values are added as secrets by default to prevent leaking
      information about private repositories. If you're not worried about that,
      you can change the values directly [in the Actions workflow
      itself](https://github.com/jstrieb/github-stats/blob/05de1314b870febd44d19ad2f55d5e59d83f5857/.github/workflows/main.yml#L48-L53).
-6. Go to the [Actions
-   Page](../../actions?query=workflow%3A"Generate+Stats+Images") and press "Run
+6. Go to the [Actions Page](../../actions?query=workflow%3A"Generate+Stats+Images") and press "Run
    Workflow" on the right side of the screen to generate images for the first
    time. 
    - The images will be automatically regenerated every 24 hours, but they can
