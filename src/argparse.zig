@@ -15,8 +15,14 @@ fn free_field(allocator: std.mem.Allocator, field: anytype) void {
     }
 }
 
+var stdout: *std.Io.Writer = undefined;
+var arena: std.heap.ArenaAllocator = undefined;
+
 pub fn parse(allocator: std.mem.Allocator, T: type) !T {
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var stdout_writer = std.fs.File.stdout().writer(&.{});
+    stdout = &stdout_writer.interface;
+
+    arena = .init(allocator);
     defer arena.deinit();
     const a = arena.allocator();
 
@@ -40,14 +46,13 @@ pub fn parse(allocator: std.mem.Allocator, T: type) !T {
             if (std.mem.eql(u8, raw_arg, "-h") or
                 std.mem.eql(u8, raw_arg, "--help"))
             {
-                printUsage(T, args[0]);
+                try printUsage(T, args[0]);
                 std.process.exit(0);
             }
             // TODO: Handle one-letter arguments
             if (!std.mem.startsWith(u8, raw_arg, "--")) {
-                // TODO: Use actual printing
-                std.debug.print("Unknown argument: '{s}'\n", .{raw_arg});
-                printUsage(T, args[0]);
+                try stdout.print("Unknown argument: '{s}'\n", .{raw_arg});
+                try printUsage(T, args[0]);
                 std.process.exit(1);
             }
             const arg = try a.dupe(u8, raw_arg[2..]);
@@ -63,9 +68,8 @@ pub fn parse(allocator: std.mem.Allocator, T: type) !T {
                     continue :args;
                 }
             }
-            // TODO: Use actual printing
-            std.debug.print("Unknown argument: '{s}'\n", .{raw_arg});
-            printUsage(T, args[0]);
+            try stdout.print("Unknown argument: '{s}'\n", .{raw_arg});
+            try printUsage(T, args[0]);
             std.process.exit(1);
         }
     }
@@ -111,8 +115,25 @@ pub fn parse(allocator: std.mem.Allocator, T: type) !T {
     return result;
 }
 
-pub fn printUsage(T: type, argv0: []const u8) void {
-    // TODO: Improve
-    std.debug.print("Usage: {s}\n", .{argv0});
-    _ = T;
+fn printUsage(T: type, argv0: []const u8) !void {
+    const a = arena.allocator();
+    try stdout.print("Usage: {s} [options]\n\n", .{argv0});
+    try stdout.print("Options:\n", .{});
+    const fields = @typeInfo(T).@"struct".fields;
+    inline for (fields) |field| {
+        switch (@typeInfo(strip_optional(field.type))) {
+            .bool => {
+                const flag_version = try a.dupe(u8, field.name);
+                defer a.free(flag_version);
+                std.mem.replaceScalar(u8, flag_version, '_', '-');
+                try stdout.print("--{s}\n", .{flag_version});
+            },
+            else => {
+                const flag_version = try a.dupe(u8, field.name);
+                defer a.free(flag_version);
+                std.mem.replaceScalar(u8, flag_version, '_', '-');
+                try stdout.print("--{s} {s}\n", .{ flag_version, field.name });
+            },
+        }
+    }
 }
