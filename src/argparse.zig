@@ -8,10 +8,10 @@ fn strip_optional(T: type) type {
 
 fn free_field(allocator: std.mem.Allocator, field: anytype) void {
     switch (@typeInfo(@TypeOf(field))) {
-        .array => allocator.free(field),
+        .pointer => allocator.free(field),
         .optional => free_field(allocator, field.?),
         .bool, .int, .float, .@"enum" => {},
-        else => unreachable,
+        else => @compileError("Disallowed struct field type."),
     }
 }
 
@@ -37,9 +37,9 @@ pub fn parse(allocator: std.mem.Allocator, T: type) !T {
         }
     }
 
+    const args = try std.process.argsAlloc(a);
+    defer std.process.argsFree(a, args);
     {
-        const args = try std.process.argsAlloc(a);
-        defer std.process.argsFree(a, args);
         var i: usize = 1;
         args: while (i < args.len) : (i += 1) {
             const raw_arg = args[i];
@@ -60,10 +60,30 @@ pub fn parse(allocator: std.mem.Allocator, T: type) !T {
             std.mem.replaceScalar(u8, arg, '-', '_');
             inline for (fields, &seen) |field, *seen_field| {
                 if (!seen_field.* and std.ascii.eqlIgnoreCase(arg, field.name)) {
-                    // TODO: Switch on field type and parse if applicable
-                    i += 1;
-                    // TODO: Fix possible memory leak
-                    @field(result, field.name) = try allocator.dupe(u8, args[i]);
+                    const t = @typeInfo(strip_optional(field.type));
+                    if (t == .bool) {
+                        @field(result, field.name) = true;
+                    } else {
+                        i += 1;
+                        if (i >= args.len) {
+                            try stdout.print(
+                                "Missing required value for argument {s} {s}\n",
+                                .{ raw_arg, field.name },
+                            );
+                            try printUsage(T, args[0]);
+                            std.process.exit(1);
+                        }
+                        switch (t) {
+                            // TODO
+                            .int, .float, .@"enum" => comptime unreachable,
+                            .pointer => @field(
+                                result,
+                                field.name,
+                            ) = try allocator.dupe(u8, args[i]),
+                            .bool => comptime unreachable,
+                            else => @compileError("Disallowed struct field type."),
+                        }
+                    }
                     seen_field.* = true;
                     continue :args;
                 }
@@ -84,11 +104,21 @@ pub fn parse(allocator: std.mem.Allocator, T: type) !T {
             std.mem.replaceScalar(u8, key, '-', '_');
             inline for (fields, &seen) |field, *seen_field| {
                 if (!seen_field.* and std.ascii.eqlIgnoreCase(key, field.name)) {
-                    // TODO: Switch on field type and parse if applicable
-                    @field(result, field.name) = try allocator.dupe(
-                        u8,
-                        entry.value_ptr.*,
-                    );
+                    switch (@typeInfo(strip_optional(field.type))) {
+                        .bool => {
+                            const value = try a.dupe(u8, entry.value_ptr.*);
+                            defer a.free(value);
+                            @field(result, field.name) = value.len > 0 and
+                                !std.ascii.eqlIgnoreCase(value, "false");
+                        },
+                        // TODO
+                        .int, .float, .@"enum" => comptime unreachable,
+                        .pointer => @field(
+                            result,
+                            field.name,
+                        ) = try allocator.dupe(u8, entry.value_ptr.*),
+                        else => @compileError("Disallowed struct field type."),
+                    }
                     seen_field.* = true;
                 }
             }
@@ -98,8 +128,14 @@ pub fn parse(allocator: std.mem.Allocator, T: type) !T {
     inline for (fields, &seen) |field, *seen_field| {
         if (!seen_field.*) {
             if (field.defaultValue()) |default| {
-                // TODO: Switch on field type and duplicate if applicable
-                @field(result, field.name) = default;
+                switch (@typeInfo(strip_optional(field.type))) {
+                    .bool, .int, .float, .@"enum" => @field(result, field.name) = default,
+                    .pointer => @field(
+                        result,
+                        field.name,
+                    ) = try allocator.dupe(u8, default),
+                    else => @compileError("Disallowed struct field type."),
+                }
                 seen_field.* = true;
             }
         }
@@ -107,8 +143,13 @@ pub fn parse(allocator: std.mem.Allocator, T: type) !T {
 
     inline for (fields, seen) |field, seen_field| {
         if (!seen_field) {
-            std.log.err("Missing required argument {s}", .{field.name});
-            return error.MissingArgument;
+            if (@typeInfo(strip_optional(field.type)) == .bool) {
+                @field(result, field.name) = false;
+            } else {
+                try stdout.print("Missing required argument {s}\n", .{field.name});
+                try printUsage(T, args[0]);
+                std.process.exit(1);
+            }
         }
     }
 
