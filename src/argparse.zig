@@ -9,7 +9,7 @@ fn strip_optional(T: type) type {
 fn free_field(allocator: std.mem.Allocator, field: anytype) void {
     switch (@typeInfo(@TypeOf(field))) {
         .pointer => allocator.free(field),
-        .optional => free_field(allocator, field.?),
+        .optional => if (field) |v| free_field(allocator, v),
         .bool, .int, .float, .@"enum" => {},
         else => @compileError("Disallowed struct field type."),
     }
@@ -49,17 +49,21 @@ pub fn parse(allocator: std.mem.Allocator, T: type) !T {
                 try printUsage(T, args[0]);
                 std.process.exit(0);
             }
+
             // TODO: Handle one-letter arguments
             if (!std.mem.startsWith(u8, raw_arg, "--")) {
                 try stdout.print("Unknown argument: '{s}'\n", .{raw_arg});
                 try printUsage(T, args[0]);
                 std.process.exit(1);
             }
+
             const arg = try a.dupe(u8, raw_arg[2..]);
             defer a.free(arg);
             std.mem.replaceScalar(u8, arg, '-', '_');
             inline for (fields, &seen) |field, *seen_field| {
-                if (!seen_field.* and std.ascii.eqlIgnoreCase(arg, field.name)) {
+                if (!seen_field.* and
+                    std.ascii.eqlIgnoreCase(arg, field.name))
+                {
                     const t = @typeInfo(strip_optional(field.type));
                     if (t == .bool) {
                         @field(result, field.name) = true;
@@ -81,13 +85,16 @@ pub fn parse(allocator: std.mem.Allocator, T: type) !T {
                                 field.name,
                             ) = try allocator.dupe(u8, args[i]),
                             .bool => comptime unreachable,
-                            else => @compileError("Disallowed struct field type."),
+                            else => @compileError(
+                                "Disallowed struct field type.",
+                            ),
                         }
                     }
                     seen_field.* = true;
                     continue :args;
                 }
             }
+
             try stdout.print("Unknown argument: '{s}'\n", .{raw_arg});
             try printUsage(T, args[0]);
             std.process.exit(1);
@@ -103,7 +110,9 @@ pub fn parse(allocator: std.mem.Allocator, T: type) !T {
             defer a.free(key);
             std.mem.replaceScalar(u8, key, '-', '_');
             inline for (fields, &seen) |field, *seen_field| {
-                if (!seen_field.* and std.ascii.eqlIgnoreCase(key, field.name)) {
+                if (!seen_field.* and
+                    std.ascii.eqlIgnoreCase(key, field.name))
+                {
                     switch (@typeInfo(strip_optional(field.type))) {
                         .bool => {
                             const value = try a.dupe(u8, entry.value_ptr.*);
@@ -129,11 +138,13 @@ pub fn parse(allocator: std.mem.Allocator, T: type) !T {
         if (!seen_field.*) {
             if (field.defaultValue()) |default| {
                 switch (@typeInfo(strip_optional(field.type))) {
-                    .bool, .int, .float, .@"enum" => @field(result, field.name) = default,
+                    .bool, .int, .float, .@"enum" => {
+                        @field(result, field.name) = default;
+                    },
                     .pointer => @field(
                         result,
                         field.name,
-                    ) = try allocator.dupe(u8, default),
+                    ) = if (default) |p| try allocator.dupe(u8, p) else null,
                     else => @compileError("Disallowed struct field type."),
                 }
                 seen_field.* = true;
@@ -146,7 +157,10 @@ pub fn parse(allocator: std.mem.Allocator, T: type) !T {
             if (@typeInfo(strip_optional(field.type)) == .bool) {
                 @field(result, field.name) = false;
             } else {
-                try stdout.print("Missing required argument {s}\n", .{field.name});
+                try stdout.print(
+                    "Missing required argument {s}\n",
+                    .{field.name},
+                );
                 try printUsage(T, args[0]);
                 std.process.exit(1);
             }
