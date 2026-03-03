@@ -29,9 +29,11 @@ fn logFn(
 
 const Args = struct {
     api_key: []const u8,
+    json_output_file: ?[]const u8 = null,
 
     pub fn deinit(self: @This()) void {
         allocator.free(self.api_key);
+        if (self.json_output_file) |output| allocator.free(output);
     }
 };
 
@@ -47,23 +49,28 @@ pub fn main() !void {
     defer client.deinit();
     const stats = try Statistics.init(&client, allocator);
     defer stats.deinit();
-    print(stats);
+
+    if (args.json_output_file) |path| {
+        const out =
+            if (std.mem.eql(u8, path, "-"))
+                std.fs.File.stdout()
+            else
+                try std.fs.cwd().createFile(path, .{});
+        defer out.close();
+        var write_buffer: [0x100]u8 = undefined;
+        var _writer = out.writer(&write_buffer);
+        const writer = &_writer.interface;
+
+        var arena = std.heap.ArenaAllocator.init(allocator);
+        defer arena.deinit();
+        try writer.writeAll(
+            try std.json.Stringify.valueAlloc(
+                arena.allocator(),
+                stats,
+                .{ .whitespace = .indent_2 },
+            ),
+        );
+    }
 
     // TODO: Output images from templates
-}
-
-// TODO: Remove
-fn print(x: anytype) void {
-    if (builtin.mode != .Debug) {
-        @compileError("Do not use JSON print in real code!");
-    }
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-    std.debug.print("{s}\n", .{
-        std.json.Stringify.valueAlloc(
-            arena.allocator(),
-            x,
-            .{ .whitespace = .indent_2 },
-        ) catch unreachable,
-    });
 }
