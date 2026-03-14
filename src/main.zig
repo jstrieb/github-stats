@@ -73,6 +73,7 @@ pub fn main() !void {
                 .{ .whitespace = .indent_2 },
             ),
         );
+        try writer.interface.flush();
     }
 
     // TODO: Output images from templates
