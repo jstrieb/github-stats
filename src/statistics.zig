@@ -3,6 +3,7 @@ const HttpClient = @import("http_client.zig");
 
 repositories: []Repository,
 user: []const u8,
+name: []const u8,
 repo_contributions: u32 = 0,
 issue_contributions: u32 = 0,
 commit_contributions: u32 = 0,
@@ -115,17 +116,19 @@ pub fn deinit(self: Statistics) void {
     }
     allocator.free(self.repositories);
     allocator.free(self.user);
+    allocator.free(self.name);
 }
 
-fn get_years(
+fn get_basic_info(
     client: *HttpClient,
     alloc: std.mem.Allocator,
-) !struct { []u32, []const u8 } {
+) !struct { []u32, []const u8, ?[]const u8 } {
     std.log.info("Getting contribution years...", .{});
     const response, const status = try client.graphql(
         \\query {
         \\  viewer {
         \\    login
+        \\    name
         \\    contributionsCollection {
         \\      contributionYears
         \\    }
@@ -142,6 +145,7 @@ fn get_years(
     const parsed = (try std.json.parseFromSliceLeaky(
         struct { data: struct { viewer: struct {
             login: []const u8,
+            name: ?[]const u8,
             contributionsCollection: struct {
                 contributionYears: []u32,
             },
@@ -150,7 +154,11 @@ fn get_years(
         response,
         .{ .ignore_unknown_fields = true },
     )).data.viewer;
-    return .{ parsed.contributionsCollection.contributionYears, parsed.login };
+    return .{
+        parsed.contributionsCollection.contributionYears,
+        parsed.login,
+        parsed.name,
+    };
 }
 
 fn get_repos(
@@ -158,13 +166,8 @@ fn get_repos(
     client: *HttpClient,
 ) !Statistics {
     var result: Statistics = .{
-        .repo_contributions = 0,
-        .issue_contributions = 0,
-        .commit_contributions = 0,
-        .pr_contributions = 0,
-        .review_contributions = 0,
-
         .user = undefined,
+        .name = undefined,
         .repositories = undefined,
     };
     var repositories: std.ArrayList(Repository) =
@@ -178,8 +181,13 @@ fn get_repos(
     var seen: std.StringHashMap(bool) = .init(arena.allocator());
     defer seen.deinit();
 
-    const years, const user = try get_years(client, arena.allocator());
-    std.log.info("Getting data for user {s}...", .{user});
+    const years, const user, const name =
+        try get_basic_info(client, arena.allocator());
+    if (name) |n| {
+        std.log.info("Getting data for {s} ({s})...", .{ n, user });
+    } else {
+        std.log.info("Getting data for user {s}...", .{user});
+    }
     for (years) |year| {
         std.log.info("Getting data from {d}...", .{year});
         var response, var status = try client.graphql(
@@ -369,6 +377,9 @@ fn get_repos(
     }.lessThanFn);
 
     result.user = try allocator.dupe(u8, user);
+    errdefer allocator.free(result.user);
+    result.name = try allocator.dupe(u8, name orelse user);
+    errdefer allocator.free(result.name);
     result.repositories = list;
     return result;
 }
