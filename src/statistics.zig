@@ -3,7 +3,11 @@ const HttpClient = @import("http_client.zig");
 
 repositories: []Repository,
 user: []const u8,
-contributions: u32 = 0,
+repo_contributions: u32 = 0,
+issue_contributions: u32 = 0,
+commit_contributions: u32 = 0,
+pr_contributions: u32 = 0,
+review_contributions: u32 = 0,
 
 var allocator: std.mem.Allocator = undefined;
 const Statistics = @This();
@@ -153,7 +157,16 @@ fn get_repos(
     arena: *std.heap.ArenaAllocator,
     client: *HttpClient,
 ) !Statistics {
-    var contributions: u32 = 0;
+    var result: Statistics = .{
+        .repo_contributions = 0,
+        .issue_contributions = 0,
+        .commit_contributions = 0,
+        .pr_contributions = 0,
+        .review_contributions = 0,
+
+        .user = undefined,
+        .repositories = undefined,
+    };
     var repositories: std.ArrayList(Repository) =
         try .initCapacity(allocator, 32);
     errdefer {
@@ -257,11 +270,12 @@ fn get_repos(
             .{ stats.commitContributionsByRepository.len, year },
         );
 
-        contributions += stats.totalRepositoryContributions;
-        contributions += stats.totalIssueContributions;
-        contributions += stats.totalCommitContributions;
-        contributions += stats.totalPullRequestContributions;
-        contributions += stats.totalPullRequestReviewContributions;
+        result.repo_contributions += stats.totalRepositoryContributions;
+        result.issue_contributions += stats.totalIssueContributions;
+        result.commit_contributions += stats.totalCommitContributions;
+        result.pr_contributions += stats.totalPullRequestContributions;
+        result.review_contributions +=
+            stats.totalPullRequestReviewContributions;
 
         // TODO: if there are 100 ore more repositories, we should subdivide
         // the date range in half
@@ -354,11 +368,9 @@ fn get_repos(
         }
     }.lessThanFn);
 
-    return .{
-        .contributions = contributions,
-        .user = try allocator.dupe(u8, user),
-        .repositories = list,
-    };
+    result.user = try allocator.dupe(u8, user);
+    result.repositories = list;
+    return result;
 }
 
 fn get_lines_changed(

@@ -58,12 +58,11 @@ pub fn main() !void {
                 try std.fs.cwd().createFile(path, .{});
         defer out.close();
         var write_buffer: [0x100]u8 = undefined;
-        var _writer = out.writer(&write_buffer);
-        const writer = &_writer.interface;
+        var writer = out.writer(&write_buffer);
 
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
-        try writer.writeAll(
+        try writer.interface.writeAll(
             try std.json.Stringify.valueAlloc(
                 arena.allocator(),
                 stats,
