@@ -30,6 +30,7 @@ fn logFn(
 const Args = struct {
     api_key: []const u8,
     json_output_file: ?[]const u8 = null,
+    verbose: bool = false,
 
     pub fn deinit(self: @This()) void {
         allocator.free(self.api_key);
@@ -44,6 +45,9 @@ pub fn main() !void {
 
     const args = try argparse.parse(allocator, Args);
     defer args.deinit();
+    if (args.verbose) {
+        log_level = .debug;
+    }
 
     var client: HttpClient = try .init(allocator, args.api_key);
     defer client.deinit();
@@ -57,7 +61,7 @@ pub fn main() !void {
             else
                 try std.fs.cwd().createFile(path, .{});
         defer out.close();
-        var write_buffer: [0x100]u8 = undefined;
+        var write_buffer: [64 * 1024]u8 = undefined;
         var writer = out.writer(&write_buffer);
 
         var arena = std.heap.ArenaAllocator.init(allocator);
