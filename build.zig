@@ -23,4 +23,9 @@ pub fn build(b: *std.Build) void {
     if (b.args) |args| {
         run_cmd.addArgs(args);
     }
+
+    const tests = b.addTest(.{ .root_module = exe.root_module });
+    const run_tests = b.addRunArtifact(tests);
+    const test_step = b.step("test", "Run the tests");
+    test_step.dependOn(&run_tests.step);
 }
