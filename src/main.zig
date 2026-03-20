@@ -1,6 +1,7 @@
 const builtin = @import("builtin");
 const std = @import("std");
 const argparse = @import("argparse.zig");
+const glob = @import("glob.zig");
 
 const HttpClient = @import("http_client.zig");
 const Statistics = @import("statistics.zig");
@@ -77,4 +78,9 @@ pub fn main() !void {
     }
 
     // TODO: Output images from templates
+    _ = glob;
+}
+
+test {
+    std.testing.refAllDecls(@This());
 }
