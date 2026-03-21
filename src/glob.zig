@@ -4,8 +4,7 @@ const std = @import("std");
 /// lot of globs. Good enough for now, though. (If it's good enough for the GNU
 /// glob function, it's good enough for me.)
 ///
-/// Max recursion depth is the number of asterisks in the globbing pattern plus
-/// one.
+/// Max recursion depth is the number of stars in the globbing pattern plus one.
 pub fn match(pattern: []const u8, s: []const u8) bool {
     if (std.mem.indexOfScalar(u8, pattern, '*')) |star_offset| {
         if (!std.mem.startsWith(u8, s, pattern[0..star_offset])) {
@@ -77,13 +76,30 @@ test match {
     try testing.expect(match("som*thing", "somabcthing"));
     try testing.expect(match("som*thing", "somthing"));
 
-    try testing.expect(match("s*a*s*s*s*s*s*s*s*s", "sssssssssssssassssssssss"));
-    try testing.expect(match("s*s*s*s*s*s*s*s*s*s", "sssssssssssssassssssssss"));
-    try testing.expect(match("s*s*s*s*s*s*s*s*a*s", "sssssssssssssassssssssss"));
+    try testing.expect(match(
+        "s*a" ++ "*s" ** 8,
+        "s" ** 10 ++ "a" ++ "s" ** 10,
+    ));
+    try testing.expect(match(
+        "s" ++ "*s" ** 8,
+        "s" ** 10 ++ "a" ++ "s" ** 10,
+    ));
+    try testing.expect(match(
+        "s*" ** 8 ++ "a*s",
+        "s" ** 10 ++ "a" ++ "s" ** 10,
+    ));
 
     // Globbing here doesn't separate on slashes like globbing in the shell
     try testing.expect(match("*", "///"));
     try testing.expect(match("*", "/asdf//"));
     try testing.expect(match("/*sdf/*/*", "/asdf//"));
     try testing.expect(match("/*sdf/*", "/asdf//"));
+}
+
+test matchAny {
+    const testing = std.testing;
+
+    try testing.expect(matchAny(&.{ "*waw", "wew*", "wow", "www" }, "wow"));
+    try testing.expect(!matchAny(&.{ "*waw", "wew*", "www" }, "wow"));
+    try testing.expect(matchAny(&.{ "w*w", "www" }, "wow"));
 }
