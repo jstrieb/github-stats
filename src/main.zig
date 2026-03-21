@@ -31,6 +31,7 @@ fn logFn(
 const Args = struct {
     api_key: []const u8,
     json_output_file: ?[]const u8 = null,
+    silent: bool = false,
     verbose: bool = false,
 
     pub fn deinit(self: @This()) void {
@@ -46,7 +47,9 @@ pub fn main() !void {
 
     const args = try argparse.parse(allocator, Args);
     defer args.deinit();
-    if (args.verbose) {
+    if (args.silent) {
+        log_level = .err;
+    } else if (args.verbose) {
         log_level = .debug;
     }
 
