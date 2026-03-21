@@ -3,12 +3,15 @@ const std = @import("std");
 // Since parse is the only public function, these variables can be set there and
 // used globally.
 var stdout: *std.Io.Writer = undefined;
+var stderr: *std.Io.Writer = undefined;
 var arena: std.heap.ArenaAllocator = undefined;
 var allocator: std.mem.Allocator = undefined;
 
 pub fn parse(gpa: std.mem.Allocator, T: type) !T {
     var stdout_writer = std.fs.File.stdout().writer(&.{});
     stdout = &stdout_writer.interface;
+    var stderr_writer = std.fs.File.stderr().writer(&.{});
+    stderr = &stderr_writer.interface;
 
     allocator = gpa;
     arena = .init(allocator);
@@ -37,7 +40,7 @@ pub fn parse(gpa: std.mem.Allocator, T: type) !T {
             if (@typeInfo(strip_optional(field.type)) == .bool) {
                 @field(result, field.name) = false;
             } else {
-                try stdout.print(
+                try stderr.print(
                     "Missing required argument {s}\n",
                     .{field.name},
                 );
@@ -69,7 +72,7 @@ fn setFromCli(
 
         // TODO: Handle one-letter arguments
         if (!std.mem.startsWith(u8, raw_arg, "--")) {
-            try stdout.print("Unknown argument: '{s}'\n", .{raw_arg});
+            try stderr.print("Unknown argument: '{s}'\n", .{raw_arg});
             try printUsage(T, args[0]);
             std.process.exit(1);
         }
@@ -85,7 +88,7 @@ fn setFromCli(
                 } else {
                     i += 1;
                     if (i >= args.len) {
-                        try stdout.print(
+                        try stderr.print(
                             "Missing required value for argument {s} {s}\n",
                             .{ raw_arg, field.name },
                         );
@@ -110,7 +113,7 @@ fn setFromCli(
             }
         }
 
-        try stdout.print("Unknown argument: '{s}'\n", .{raw_arg});
+        try stderr.print("Unknown argument: '{s}'\n", .{raw_arg});
         try printUsage(T, args[0]);
         std.process.exit(1);
     }
