@@ -37,6 +37,7 @@ const Args = struct {
 
     pub fn deinit(self: @This()) void {
         if (self.api_key) |key| allocator.free(key);
+        if (self.json_input_file) |input| allocator.free(input);
         if (self.json_output_file) |output| allocator.free(output);
     }
 };
@@ -66,10 +67,21 @@ pub fn main() !void {
     }
 
     var stats: Statistics = undefined;
-    if (args.json_input_file) |infile| {
-        // TODO
-        _ = infile;
-        return error.NotImplementedYet;
+    if (args.json_input_file) |path| {
+        const in =
+            if (std.mem.eql(u8, path, "-"))
+                std.fs.File.stdin()
+            else
+                try std.fs.cwd().openFile(path, .{});
+        defer in.close();
+        var read_buffer: [64 * 1024]u8 = undefined;
+        var reader = in.reader(&read_buffer);
+        // TODO: Create a scanner from the reader instead of reading the whole
+        // file into memory
+        const data =
+            try (&reader.interface).allocRemaining(allocator, .unlimited);
+        defer allocator.free(data);
+        stats = try Statistics.initFromJson(allocator, data);
     } else if (args.api_key) |api_key| {
         var client: HttpClient = try .init(allocator, api_key);
         defer client.deinit();

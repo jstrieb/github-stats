@@ -13,17 +13,6 @@ review_contributions: u32 = 0,
 var allocator: std.mem.Allocator = undefined;
 const Statistics = @This();
 
-const Language = struct {
-    name: []const u8,
-    size: u32,
-    color: []const u8,
-
-    pub fn deinit(self: @This()) void {
-        allocator.free(self.name);
-        allocator.free(self.color);
-    }
-};
-
 const Repository = struct {
     name: []const u8,
     stars: u32,
@@ -99,6 +88,17 @@ const Repository = struct {
     }
 };
 
+const Language = struct {
+    name: []const u8,
+    size: u32,
+    color: []const u8,
+
+    pub fn deinit(self: @This()) void {
+        allocator.free(self.name);
+        allocator.free(self.color);
+    }
+};
+
 pub fn init(client: *HttpClient, a: std.mem.Allocator) !Statistics {
     allocator = a;
     var arena = std.heap.ArenaAllocator.init(allocator);
@@ -108,6 +108,20 @@ pub fn init(client: *HttpClient, a: std.mem.Allocator) !Statistics {
     errdefer self.deinit();
     try self.get_lines_changed(&arena, client);
     return self;
+}
+
+pub fn initFromJson(a: std.mem.Allocator, s: []const u8) !Statistics {
+    allocator = a;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+
+    const parsed = try std.json.parseFromSliceLeaky(
+        Statistics,
+        arena.allocator(),
+        s,
+        .{ .ignore_unknown_fields = true },
+    );
+    return try deepcopy(allocator, parsed);
 }
 
 pub fn deinit(self: Statistics) void {
@@ -440,4 +454,30 @@ fn get_lines_changed(
             },
         }
     }
+}
+
+fn deepcopy(a: std.mem.Allocator, o: anytype) !@TypeOf(o) {
+    return switch (@typeInfo(@TypeOf(o))) {
+        .pointer => |p| switch (p.size) {
+            .slice => v: {
+                const result = try a.dupe(p.child, o);
+                for (o, result) |src, *dest| {
+                    dest.* = try deepcopy(a, src);
+                }
+                break :v result;
+            },
+            // Only slices in this struct
+            else => comptime unreachable,
+        },
+        .@"struct" => |s| v: {
+            var result = o;
+            inline for (s.fields) |field| {
+                @field(result, field.name) =
+                    try deepcopy(a, @field(o, field.name));
+            }
+            break :v result;
+        },
+        .optional => if (o) |v| try deepcopy(a, v) else null,
+        else => o,
+    };
 }
