@@ -7,7 +7,11 @@ var stderr: *std.Io.Writer = undefined;
 var arena: std.heap.ArenaAllocator = undefined;
 var allocator: std.mem.Allocator = undefined;
 
-pub fn parse(gpa: std.mem.Allocator, T: type) !T {
+pub fn parse(
+    gpa: std.mem.Allocator,
+    T: type,
+    errorCheck: ?fn (args: T, stderr: *std.Io.Writer) anyerror!bool,
+) !T {
     var stdout_writer = std.fs.File.stdout().writer(&.{});
     stdout = &stdout_writer.interface;
     var stderr_writer = std.fs.File.stderr().writer(&.{});
@@ -47,6 +51,13 @@ pub fn parse(gpa: std.mem.Allocator, T: type) !T {
                 try printUsage(T, args[0]);
                 std.process.exit(1);
             }
+        }
+    }
+
+    if (errorCheck) |check| {
+        if (!(try check(result, stderr))) {
+            try printUsage(T, args[0]);
+            std.process.exit(1);
         }
     }
 

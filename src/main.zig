@@ -29,13 +29,14 @@ fn logFn(
 }
 
 const Args = struct {
-    api_key: []const u8,
+    api_key: ?[]const u8 = null,
+    json_input_file: ?[]const u8 = null,
     json_output_file: ?[]const u8 = null,
     silent: bool = false,
     verbose: bool = false,
 
     pub fn deinit(self: @This()) void {
-        allocator.free(self.api_key);
+        if (self.api_key) |key| allocator.free(key);
         if (self.json_output_file) |output| allocator.free(output);
     }
 };
@@ -45,7 +46,18 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     allocator = gpa.allocator();
 
-    const args = try argparse.parse(allocator, Args);
+    const args = try argparse.parse(allocator, Args, struct {
+        fn errorCheck(a: Args, stderr: *std.Io.Writer) !bool {
+            if (a.api_key == null and a.json_input_file == null) {
+                try stderr.print(
+                    "You must pass either an input file or an API key.\n",
+                    .{},
+                );
+                return false;
+            }
+            return true;
+        }
+    }.errorCheck);
     defer args.deinit();
     if (args.silent) {
         log_level = .err;
@@ -53,9 +65,16 @@ pub fn main() !void {
         log_level = .debug;
     }
 
-    var client: HttpClient = try .init(allocator, args.api_key);
-    defer client.deinit();
-    const stats = try Statistics.init(&client, allocator);
+    var stats: Statistics = undefined;
+    if (args.json_input_file) |infile| {
+        // TODO
+        _ = infile;
+        return error.NotImplementedYet;
+    } else if (args.api_key) |api_key| {
+        var client: HttpClient = try .init(allocator, api_key);
+        defer client.deinit();
+        stats = try Statistics.init(&client, allocator);
+    } else unreachable;
     defer stats.deinit();
 
     if (args.json_output_file) |path| {
