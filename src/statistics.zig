@@ -321,6 +321,8 @@ fn get_repos(
             };
 
             if (raw_repo.languages) |repo_languages| {
+                // TODO: Properly free partially initialized memory when any try
+                // fails in this block
                 if (repo_languages.edges) |raw_languages| {
                     repository.languages = try allocator.alloc(
                         Language,
@@ -334,7 +336,7 @@ fn get_repos(
                             .name = try allocator.dupe(u8, raw.node.name),
                             .size = raw.size,
                             // TODO: Add sensible default color
-                            .color = "",
+                            .color = try allocator.dupe(u8, ""),
                         };
                         if (raw.node.color) |color| {
                             language.color = try allocator.dupe(u8, color);
@@ -443,6 +445,7 @@ fn get_lines_changed(
                 // Exponential backoff (in expectation) with jitter
                 item.delay +=
                     std.crypto.random.intRangeAtMost(i64, 2, item.delay);
+                item.delay = @min(item.delay, 240);
                 try q.add(item);
             },
             else => |status| {

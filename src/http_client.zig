@@ -8,7 +8,6 @@ gpa: std.mem.Allocator,
 arena: *std.heap.ArenaAllocator,
 client: std.http.Client,
 bearer: []const u8,
-last_request: ?i64 = null,
 
 const Self = @This();
 const Response = struct { []const u8, std.http.Status };
@@ -41,8 +40,7 @@ pub fn get(
         self.arena.allocator(),
         1024,
     );
-    defer writer.deinit();
-    const now = std.time.timestamp();
+    errdefer writer.deinit();
     const status = (try (self.client.fetch(.{
         .location = .{ .url = url },
         .response_writer = &writer.writer,
@@ -65,7 +63,6 @@ pub fn get(
         },
         else => err,
     })).status;
-    self.last_request = now;
     return .{ try writer.toOwnedSlice(), status };
 }
 
@@ -79,8 +76,7 @@ pub fn post(
         self.arena.allocator(),
         1024,
     );
-    defer writer.deinit();
-    const now = std.time.timestamp();
+    errdefer writer.deinit();
     const status = (try (self.client.fetch(.{
         .location = .{ .url = url },
         .response_writer = &writer.writer,
@@ -103,7 +99,6 @@ pub fn post(
         },
         else => err,
     })).status;
-    self.last_request = now;
     return .{ try writer.toOwnedSlice(), status };
 }
 
