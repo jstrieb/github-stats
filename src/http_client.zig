@@ -112,22 +112,18 @@ pub fn post(
     return .{ try writer.toOwnedSlice(), status };
 }
 
-const Query = struct {
-    query: []const u8,
-    variables: ?[]const u8,
-};
-
 pub fn graphql(
     self: *Self,
     body: []const u8,
-    variables: ?[]const u8,
+    variables: anytype,
 ) !Response {
     var arena = std.heap.ArenaAllocator.init(self.arena.allocator());
     defer arena.deinit();
     const allocator = arena.allocator();
+
     return try self.post(
         "https://api.github.com/graphql",
-        try std.json.Stringify.valueAlloc(allocator, Query{
+        try std.json.Stringify.valueAlloc(allocator, .{
             .query = body,
             .variables = variables,
         }, .{}),

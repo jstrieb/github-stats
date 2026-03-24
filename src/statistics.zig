@@ -236,17 +236,18 @@ fn get_repos(
             \\  }
             \\}
         ,
-            // NOTE: Replace with actual JSON serialization if using more
-            // complex tyeps. This is fine as long as we're only using numbers.
-            try std.fmt.allocPrint(
-                arena.allocator(),
-                \\{{
-                \\  "from": "{d}-01-01T00:00:00Z",
-                \\  "to": "{d}-01-01T00:00:00Z"
-                \\}}
-            ,
-                .{ year, year + 1 },
-            ),
+            .{
+                .from = try std.fmt.allocPrint(
+                    arena.allocator(),
+                    "{d}-01-01T00:00:00Z",
+                    .{year},
+                ),
+                .to = try std.fmt.allocPrint(
+                    arena.allocator(),
+                    "{d}-01-01T00:00:00Z",
+                    .{year + 1},
+                ),
+            },
         );
         if (status != .ok) {
             std.log.err(
