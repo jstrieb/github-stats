@@ -1,5 +1,6 @@
 const builtin = @import("builtin");
 const std = @import("std");
+
 const argparse = @import("argparse.zig");
 const glob = @import("glob.zig");
 
@@ -15,7 +16,6 @@ var log_level: std.log.Level = switch (builtin.mode) {
     else => .warn,
 };
 var allocator: std.mem.Allocator = undefined;
-var user: []const u8 = undefined;
 
 fn logFn(
     comptime message_level: std.log.Level,
