@@ -18,8 +18,8 @@ const Repository = struct {
     stars: u32,
     forks: u32,
     languages: ?[]Language,
-    views: u32,
     lines_changed: u32,
+    views: u32,
 
     pub fn deinit(self: @This()) void {
         allocator.free(self.name);

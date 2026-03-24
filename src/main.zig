@@ -135,8 +135,43 @@ pub fn main() !void {
         try writer.interface.flush();
     }
 
-    var languages = std.StringArrayHashMap(u64).init(allocator);
-    defer languages.deinit();
+    var aggregate_stats: struct {
+        languages: std.StringArrayHashMap(u64),
+        contributions: usize,
+        stars: usize = 0,
+        forks: usize = 0,
+        lines_changed: usize = 0,
+        views: usize = 0,
+        repos: usize = 0,
+    } = .{
+        .contributions = stats.repo_contributions +
+            stats.issue_contributions +
+            stats.commit_contributions +
+            stats.pr_contributions +
+            stats.review_contributions,
+        .languages = .init(allocator),
+    };
+    defer aggregate_stats.languages.deinit();
+    for (stats.repositories) |repository| {
+        if (glob.matchAny(excluded_repos orelse &.{}, repository.name)) {
+            continue;
+        }
+        aggregate_stats.stars += repository.stars;
+        aggregate_stats.forks += repository.forks;
+        aggregate_stats.lines_changed += repository.lines_changed;
+        aggregate_stats.views += repository.views;
+        aggregate_stats.repos += 1;
+    }
+    inline for (@typeInfo(@TypeOf(aggregate_stats)).@"struct".fields) |field| {
+        if (!std.mem.eql(u8, field.name, "languages")) {
+            std.debug.print("{s}: {any}\n", .{
+                field.name,
+                @field(aggregate_stats, field.name),
+            });
+        }
+    }
+    std.debug.print("\n", .{});
+
     for (stats.repositories) |repository| {
         if (glob.matchAny(excluded_repos orelse &.{}, repository.name)) {
             continue;
@@ -145,20 +180,17 @@ pub fn main() !void {
             if (glob.matchAny(excluded_langs orelse &.{}, language.name)) {
                 continue;
             }
-            var total = languages.get(language.name) orelse 0;
+            var total = aggregate_stats.languages.get(language.name) orelse 0;
             total += language.size;
-            try languages.put(language.name, total);
+            try aggregate_stats.languages.put(language.name, total);
         };
     }
     for (
-        languages.unmanaged.entries.slice().items(.key),
-        languages.unmanaged.entries.slice().items(.value),
+        aggregate_stats.languages.keys(),
+        aggregate_stats.languages.values(),
     ) |key, value| {
         std.debug.print("{s}: {any}\n", .{ key, value });
     }
-
-    // TODO: Output images from templates
-    _ = glob;
 }
 
 test {
