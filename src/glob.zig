@@ -88,6 +88,8 @@ test match {
         "s*" ** 8 ++ "a*s",
         "s" ** 10 ++ "a" ++ "s" ** 10,
     ));
+    // Trigger slow (exponential) worst-case
+    try testing.expect(!match("s*" ** 8 ++ "a", "s" ** 30));
 
     // Globbing here doesn't separate on slashes like globbing in the shell
     try testing.expect(match("*", "///"));
