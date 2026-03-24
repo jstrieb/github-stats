@@ -20,6 +20,7 @@ const Repository = struct {
     languages: ?[]Language,
     lines_changed: u32,
     views: u32,
+    private: bool,
 
     pub fn deinit(self: @This()) void {
         allocator.free(self.name);
@@ -218,6 +219,7 @@ fn get_repos(
             \\          nameWithOwner
             \\          stargazerCount
             \\          forkCount
+            \\          isPrivate
             \\          languages(
             \\              first: 100,
             \\              orderBy: { direction: DESC, field: SIZE }
@@ -269,6 +271,7 @@ fn get_repos(
                             nameWithOwner: []const u8,
                             stargazerCount: u32,
                             forkCount: u32,
+                            isPrivate: bool,
                             languages: ?struct {
                                 edges: ?[]struct {
                                     size: u32,
@@ -316,6 +319,7 @@ fn get_repos(
                 .name = try allocator.dupe(u8, raw_repo.nameWithOwner),
                 .stars = raw_repo.stargazerCount,
                 .forks = raw_repo.forkCount,
+                .private = raw_repo.isPrivate,
                 .languages = null,
                 .views = 0,
                 .lines_changed = 0,

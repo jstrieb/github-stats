@@ -36,6 +36,7 @@ const Args = struct {
     verbose: bool = false,
     excluded_repos: ?[]const u8 = null,
     excluded_langs: ?[]const u8 = null,
+    exclude_private: bool = false,
 
     pub fn deinit(self: @This()) void {
         if (self.api_key) |s| allocator.free(s);
@@ -153,7 +154,9 @@ pub fn main() !void {
     };
     defer aggregate_stats.languages.deinit();
     for (stats.repositories) |repository| {
-        if (glob.matchAny(excluded_repos orelse &.{}, repository.name)) {
+        if (glob.matchAny(excluded_repos orelse &.{}, repository.name) or
+            (args.exclude_private and repository.private))
+        {
             continue;
         }
         aggregate_stats.stars += repository.stars;
@@ -161,7 +164,16 @@ pub fn main() !void {
         aggregate_stats.lines_changed += repository.lines_changed;
         aggregate_stats.views += repository.views;
         aggregate_stats.repos += 1;
+        if (repository.languages) |langs| for (langs) |language| {
+            if (glob.matchAny(excluded_langs orelse &.{}, language.name)) {
+                continue;
+            }
+            var total = aggregate_stats.languages.get(language.name) orelse 0;
+            total += language.size;
+            try aggregate_stats.languages.put(language.name, total);
+        };
     }
+
     inline for (@typeInfo(@TypeOf(aggregate_stats)).@"struct".fields) |field| {
         if (!std.mem.eql(u8, field.name, "languages")) {
             std.debug.print("{s}: {any}\n", .{
@@ -172,19 +184,6 @@ pub fn main() !void {
     }
     std.debug.print("\n", .{});
 
-    for (stats.repositories) |repository| {
-        if (glob.matchAny(excluded_repos orelse &.{}, repository.name)) {
-            continue;
-        }
-        if (repository.languages) |langs| for (langs) |language| {
-            if (glob.matchAny(excluded_langs orelse &.{}, language.name)) {
-                continue;
-            }
-            var total = aggregate_stats.languages.get(language.name) orelse 0;
-            total += language.size;
-            try aggregate_stats.languages.put(language.name, total);
-        };
-    }
     for (
         aggregate_stats.languages.keys(),
         aggregate_stats.languages.values(),
