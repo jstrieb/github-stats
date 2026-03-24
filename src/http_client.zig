@@ -35,7 +35,12 @@ pub fn get(
     url: []const u8,
     headers: std.http.Client.Request.Headers,
     extra_headers: []const std.http.Header,
+    retries: isize,
 ) !Response {
+    if (retries <= -1) {
+        return error.TooManyRetries;
+    }
+
     var writer = try std.Io.Writer.Allocating.initCapacity(
         self.arena.allocator(),
         1024,
@@ -50,7 +55,7 @@ pub fn get(
         error.HttpConnectionClosing => {
             // Handle a Zig HTTP bug where keep-alive connections are closed by
             // the server after a timeout, but the client doesn't handle it
-            // properly. For now we nuke the whole client (and associate
+            // properly. For now we nuke the whole client (and associated
             // connection pool) and make a new one, but there might be a better
             // way to handle this.
             std.log.debug(
@@ -59,7 +64,7 @@ pub fn get(
             );
             self.client.deinit();
             self.client = .{ .allocator = self.arena.allocator() };
-            return self.get(url, headers, extra_headers);
+            return self.get(url, headers, extra_headers, retries - 1);
         },
         else => err,
     })).status;
@@ -71,7 +76,12 @@ pub fn post(
     url: []const u8,
     body: []const u8,
     headers: std.http.Client.Request.Headers,
+    retries: isize,
 ) !Response {
+    if (retries <= -1) {
+        return error.TooManyRetries;
+    }
+
     var writer = try std.Io.Writer.Allocating.initCapacity(
         self.arena.allocator(),
         1024,
@@ -86,7 +96,7 @@ pub fn post(
         error.HttpConnectionClosing => {
             // Handle a Zig HTTP bug where keep-alive connections are closed by
             // the server after a timeout, but the client doesn't handle it
-            // properly. For now we nuke the whole client (and associate
+            // properly. For now we nuke the whole client (and associated
             // connection pool) and make a new one, but there might be a better
             // way to handle this.
             std.log.debug(
@@ -95,7 +105,7 @@ pub fn post(
             );
             self.client.deinit();
             self.client = .{ .allocator = self.arena.allocator() };
-            return self.post(url, body, headers);
+            return self.post(url, body, headers, retries - 1);
         },
         else => err,
     })).status;
@@ -125,6 +135,7 @@ pub fn graphql(
             .authorization = .{ .override = self.bearer },
             .content_type = .{ .override = "application/json" },
         },
+        8,
     );
 }
 
@@ -139,5 +150,6 @@ pub fn rest(
             .content_type = .{ .override = "application/json" },
         },
         &.{.{ .name = "X-GitHub-Api-Version", .value = "2022-11-28" }},
+        8,
     );
 }
