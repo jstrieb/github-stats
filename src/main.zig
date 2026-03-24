@@ -34,11 +34,15 @@ const Args = struct {
     json_output_file: ?[]const u8 = null,
     silent: bool = false,
     verbose: bool = false,
+    excluded_repos: ?[]const u8 = null,
+    excluded_langs: ?[]const u8 = null,
 
     pub fn deinit(self: @This()) void {
-        if (self.api_key) |key| allocator.free(key);
-        if (self.json_input_file) |input| allocator.free(input);
-        if (self.json_output_file) |output| allocator.free(output);
+        if (self.api_key) |s| allocator.free(s);
+        if (self.json_input_file) |s| allocator.free(s);
+        if (self.json_output_file) |s| allocator.free(s);
+        if (self.excluded_repos) |s| allocator.free(s);
+        if (self.excluded_langs) |s| allocator.free(s);
     }
 };
 
@@ -65,6 +69,26 @@ pub fn main() !void {
     } else if (args.verbose) {
         log_level = .debug;
     }
+    const excluded_repos = if (args.excluded_repos) |excluded| excluded: {
+        var list = try std.ArrayList([]const u8).initCapacity(allocator, 16);
+        errdefer list.deinit(allocator);
+        var iterator = std.mem.tokenizeAny(u8, excluded, ", \t\r\n|\"'\x00");
+        while (iterator.next()) |pattern| {
+            try list.append(allocator, pattern);
+        }
+        break :excluded try list.toOwnedSlice(allocator);
+    } else null;
+    defer if (excluded_repos) |excluded| allocator.free(excluded);
+    const excluded_langs = if (args.excluded_langs) |excluded| excluded: {
+        var list = try std.ArrayList([]const u8).initCapacity(allocator, 16);
+        errdefer list.deinit(allocator);
+        var iterator = std.mem.tokenizeAny(u8, excluded, ", \t\r\n|\"'\x00");
+        while (iterator.next()) |pattern| {
+            try list.append(allocator, pattern);
+        }
+        break :excluded try list.toOwnedSlice(allocator);
+    } else null;
+    defer if (excluded_langs) |excluded| allocator.free(excluded);
 
     var stats: Statistics = undefined;
     if (args.json_input_file) |path| {
