@@ -82,9 +82,9 @@ pub fn main() !void {
     const excluded_langs = if (args.excluded_langs) |excluded| excluded: {
         var list = try std.ArrayList([]const u8).initCapacity(allocator, 16);
         errdefer list.deinit(allocator);
-        var iterator = std.mem.tokenizeAny(u8, excluded, ", \t\r\n|\"'\x00");
+        var iterator = std.mem.tokenizeAny(u8, excluded, ",\t\r\n|\"'\x00");
         while (iterator.next()) |pattern| {
-            try list.append(allocator, pattern);
+            try list.append(allocator, std.mem.trim(u8, pattern, " "));
         }
         break :excluded try list.toOwnedSlice(allocator);
     } else null;
@@ -133,6 +133,28 @@ pub fn main() !void {
             ),
         );
         try writer.interface.flush();
+    }
+
+    var languages = std.StringArrayHashMap(u64).init(allocator);
+    defer languages.deinit();
+    for (stats.repositories) |repository| {
+        if (glob.matchAny(excluded_repos orelse &.{}, repository.name)) {
+            continue;
+        }
+        if (repository.languages) |langs| for (langs) |language| {
+            if (glob.matchAny(excluded_langs orelse &.{}, language.name)) {
+                continue;
+            }
+            var total = languages.get(language.name) orelse 0;
+            total += language.size;
+            try languages.put(language.name, total);
+        };
+    }
+    for (
+        languages.unmanaged.entries.slice().items(.key),
+        languages.unmanaged.entries.slice().items(.value),
+    ) |key, value| {
+        std.debug.print("{s}: {any}\n", .{ key, value });
     }
 
     // TODO: Output images from templates

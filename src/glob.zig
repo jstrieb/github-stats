@@ -7,7 +7,10 @@ const std = @import("std");
 /// Max recursion depth is the number of stars in the globbing pattern plus one.
 pub fn match(pattern: []const u8, s: []const u8) bool {
     if (std.mem.indexOfScalar(u8, pattern, '*')) |star_offset| {
-        if (!std.mem.startsWith(u8, s, pattern[0..star_offset])) {
+        if (!(star_offset <= s.len and std.ascii.eqlIgnoreCase(
+            s[0..star_offset],
+            pattern[0..star_offset],
+        ))) {
             return false;
         }
         const rest = pattern[star_offset + 1 ..];
@@ -18,7 +21,7 @@ pub fn match(pattern: []const u8, s: []const u8) bool {
         }
         return false;
     } else {
-        return std.mem.eql(u8, pattern, s);
+        return std.ascii.eqlIgnoreCase(pattern, s);
     }
 }
 
