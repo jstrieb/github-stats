@@ -91,11 +91,11 @@ const Repository = struct {
 const Language = struct {
     name: []const u8,
     size: u32,
-    color: []const u8,
+    color: ?[]const u8 = null,
 
     pub fn deinit(self: @This()) void {
         allocator.free(self.name);
-        allocator.free(self.color);
+        if (self.color) |color| allocator.free(color);
     }
 };
 
@@ -300,7 +300,7 @@ fn get_repos(
         result.review_contributions +=
             stats.totalPullRequestReviewContributions;
 
-        // TODO: if there are 100 ore more repositories, we should subdivide
+        // TODO: if there are 100 or more repositories, we should subdivide
         // the date range in half
 
         for (stats.commitContributionsByRepository) |x| {
@@ -336,8 +336,6 @@ fn get_repos(
                         language.* = .{
                             .name = try allocator.dupe(u8, raw.node.name),
                             .size = raw.size,
-                            // TODO: Add sensible default color
-                            .color = try allocator.dupe(u8, ""),
                         };
                         if (raw.node.color) |color| {
                             language.color = try allocator.dupe(u8, color);
