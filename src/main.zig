@@ -93,6 +93,7 @@ pub fn main() !void {
 
     var stats: Statistics = undefined;
     if (args.json_input_file) |path| {
+        std.log.info("Reading statistics from '{s}'", .{path});
         const in =
             if (std.mem.eql(u8, path, "-"))
                 std.fs.File.stdin()
@@ -108,6 +109,7 @@ pub fn main() !void {
         defer allocator.free(data);
         stats = try Statistics.initFromJson(allocator, data);
     } else if (args.api_key) |api_key| {
+        std.log.info("Collecting statistics from GitHub API", .{});
         var client: HttpClient = try .init(allocator, api_key);
         defer client.deinit();
         stats = try Statistics.init(&client, allocator);
@@ -115,6 +117,7 @@ pub fn main() !void {
     defer stats.deinit();
 
     if (args.json_output_file) |path| {
+        std.log.info("Writing raw JSON data to '{s}'", .{path});
         const out =
             if (std.mem.eql(u8, path, "-"))
                 std.fs.File.stdout()
