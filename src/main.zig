@@ -202,10 +202,9 @@ pub fn main() !void {
                         a,
                         out_data,
                         "{{ " ++ field.name ++ " }}",
-                        try std.fmt.allocPrint(
+                        try decimalToString(
                             a,
-                            "{d}",
-                            .{@field(aggregate_stats, field.name)},
+                            @field(aggregate_stats, field.name),
                         ),
                     );
                 },
@@ -231,4 +230,34 @@ pub fn main() !void {
 
 test {
     std.testing.refAllDecls(@This());
+}
+
+fn decimalToString(allocator: std.mem.Allocator, n: anytype) ![]const u8 {
+    const info = @typeInfo(@TypeOf(n));
+    if (info != .int or info.int.signedness != .unsigned) {
+        @compileError("Only implemented for unsigned integer numbers.");
+    }
+    if (n == 0) {
+        return try allocator.dupe(u8, "0");
+    }
+    const s = try std.fmt.allocPrint(allocator, "{d}", .{n});
+    defer allocator.free(s);
+    const digits = s.len;
+    const commas = (digits - 1) / 3;
+    const result = try allocator.alloc(u8, digits + commas);
+    var i: usize = result.len - 1;
+    var j: usize = s.len - 1;
+    while (true) {
+        if ((result.len - i) % 4 == 0) {
+            result[i] = ',';
+            i -= 1;
+        }
+        result[i] = s[j];
+        if (i == 0 and j == 0) {
+            break;
+        } else if (i > 0 and j > 0) {} else unreachable;
+        i -= 1;
+        j -= 1;
+    }
+    return result;
 }
