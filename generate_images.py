@@ -2,7 +2,7 @@
 
  asyncios
  ios
- iod
+ oid
  re
 
  oidhttp
