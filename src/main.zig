@@ -36,6 +36,8 @@ const Args = struct {
     excluded_repos: ?[]const u8 = null,
     excluded_langs: ?[]const u8 = null,
     exclude_private: bool = false,
+    overview_output_file: ?[]const u8 = null,
+    languages_output_file: ?[]const u8 = null,
 
     const Self = @This();
 
@@ -60,6 +62,8 @@ const Args = struct {
         if (self.json_output_file) |s| allocator.free(s);
         if (self.excluded_repos) |s| allocator.free(s);
         if (self.excluded_langs) |s| allocator.free(s);
+        if (self.overview_output_file) |s| allocator.free(s);
+        if (self.languages_output_file) |s| allocator.free(s);
     }
 };
 
@@ -182,21 +186,46 @@ pub fn main() !void {
         };
     }
 
-    inline for (@typeInfo(@TypeOf(aggregate_stats)).@"struct".fields) |field| {
-        if (!std.mem.eql(u8, field.name, "languages")) {
-            std.debug.print("{s}: {any}\n", .{
-                field.name,
-                @field(aggregate_stats, field.name),
-            });
+    {
+        const template: []const u8 = @embedFile("templates/overview.svg");
+        var arena = std.heap.ArenaAllocator.init(allocator);
+        defer arena.deinit();
+        const a = arena.allocator();
+        var out_data = template;
+        inline for (
+            @typeInfo(@TypeOf(aggregate_stats)).@"struct".fields,
+        ) |field| {
+            switch (@typeInfo(field.type)) {
+                .int => {
+                    out_data = try std.mem.replaceOwned(
+                        u8,
+                        a,
+                        out_data,
+                        "{{ " ++ field.name ++ " }}",
+                        try std.fmt.allocPrint(
+                            a,
+                            "{d}",
+                            .{@field(aggregate_stats, field.name)},
+                        ),
+                    );
+                },
+                else => {},
+            }
         }
-    }
-    std.debug.print("\n", .{});
 
-    for (
-        aggregate_stats.languages.keys(),
-        aggregate_stats.languages.values(),
-    ) |key, value| {
-        std.debug.print("{s}: {any}\n", .{ key, value });
+        const path = args.overview_output_file orelse "overview.svg";
+        std.log.info("Writing overview image data to '{s}'", .{path});
+        const out =
+            if (std.mem.eql(u8, path, "-"))
+                std.fs.File.stdout()
+            else
+                try std.fs.cwd().createFile(path, .{});
+        defer out.close();
+        var write_buffer: [64 * 1024]u8 = undefined;
+        var writer = out.writer(&write_buffer);
+
+        try writer.interface.writeAll(out_data);
+        try writer.interface.flush();
     }
 }
 
