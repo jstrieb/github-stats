@@ -10,7 +10,6 @@ commit_contributions: u32 = 0,
 pr_contributions: u32 = 0,
 review_contributions: u32 = 0,
 
-var allocator: std.mem.Allocator = undefined;
 const Statistics = @This();
 
 const Repository = struct {
@@ -22,11 +21,11 @@ const Repository = struct {
     views: u32,
     private: bool,
 
-    pub fn deinit(self: @This()) void {
+    pub fn deinit(self: @This(), allocator: std.mem.Allocator) void {
         allocator.free(self.name);
         if (self.languages) |languages| {
             for (languages) |language| {
-                language.deinit();
+                language.deinit(allocator);
             }
             allocator.free(languages);
         }
@@ -94,25 +93,23 @@ const Language = struct {
     size: u32,
     color: ?[]const u8 = null,
 
-    pub fn deinit(self: @This()) void {
+    pub fn deinit(self: @This(), allocator: std.mem.Allocator) void {
         allocator.free(self.name);
         if (self.color) |color| allocator.free(color);
     }
 };
 
-pub fn init(client: *HttpClient, a: std.mem.Allocator) !Statistics {
-    allocator = a;
+pub fn init(client: *HttpClient, allocator: std.mem.Allocator) !Statistics {
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
 
-    var self: Statistics = try get_repos(&arena, client);
-    errdefer self.deinit();
+    var self: Statistics = try get_repos(allocator, &arena, client);
+    errdefer self.deinit(allocator);
     try self.get_lines_changed(&arena, client);
     return self;
 }
 
-pub fn initFromJson(a: std.mem.Allocator, s: []const u8) !Statistics {
-    allocator = a;
+pub fn initFromJson(allocator: std.mem.Allocator, s: []const u8) !Statistics {
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
 
@@ -125,9 +122,9 @@ pub fn initFromJson(a: std.mem.Allocator, s: []const u8) !Statistics {
     return try deepcopy(allocator, parsed);
 }
 
-pub fn deinit(self: Statistics) void {
+pub fn deinit(self: Statistics, allocator: std.mem.Allocator) void {
     for (self.repositories) |repository| {
-        repository.deinit();
+        repository.deinit(allocator);
     }
     allocator.free(self.repositories);
     allocator.free(self.user);
@@ -136,7 +133,7 @@ pub fn deinit(self: Statistics) void {
 
 fn get_basic_info(
     client: *HttpClient,
-    alloc: std.mem.Allocator,
+    allocator: std.mem.Allocator,
 ) !struct { []u32, []const u8, ?[]const u8 } {
     std.log.info("Getting contribution years...", .{});
     const response, const status = try client.graphql(
@@ -165,7 +162,7 @@ fn get_basic_info(
                 contributionYears: []u32,
             },
         } } },
-        alloc,
+        allocator,
         response,
         .{ .ignore_unknown_fields = true },
     )).data.viewer;
@@ -177,6 +174,7 @@ fn get_basic_info(
 }
 
 fn get_repos(
+    allocator: std.mem.Allocator,
     arena: *std.heap.ArenaAllocator,
     client: *HttpClient,
 ) !Statistics {
@@ -189,7 +187,7 @@ fn get_repos(
         try .initCapacity(allocator, 32);
     errdefer {
         for (repositories.items) |repo| {
-            repo.deinit();
+            repo.deinit(allocator);
         }
         repositories.deinit(allocator);
     }
@@ -347,7 +345,7 @@ fn get_repos(
                     }
                 }
             }
-            errdefer repository.deinit();
+            errdefer repository.deinit(allocator);
 
             std.log.info(
                 "Getting views for {s}...",

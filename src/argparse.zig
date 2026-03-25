@@ -4,11 +4,9 @@ const std = @import("std");
 // used globally.
 var stdout: *std.Io.Writer = undefined;
 var stderr: *std.Io.Writer = undefined;
-var arena: std.heap.ArenaAllocator = undefined;
-var allocator: std.mem.Allocator = undefined;
 
 pub fn parse(
-    gpa: std.mem.Allocator,
+    allocator: std.mem.Allocator,
     T: type,
     errorCheck: ?fn (args: T, stderr: *std.Io.Writer) anyerror!bool,
 ) !T {
@@ -17,8 +15,7 @@ pub fn parse(
     var stderr_writer = std.fs.File.stderr().writer(&.{});
     stderr = &stderr_writer.interface;
 
-    allocator = gpa;
-    arena = .init(allocator);
+    var arena: std.heap.ArenaAllocator = .init(allocator);
     defer arena.deinit();
     const a = arena.allocator();
 
@@ -28,16 +25,16 @@ pub fn parse(
     errdefer {
         inline for (fields, seen) |field, seen_field| {
             if (seen_field) {
-                free_field(@field(result, field.name));
+                free_field(allocator, @field(result, field.name));
             }
         }
     }
 
     const args = try std.process.argsAlloc(a);
     defer std.process.argsFree(a, args);
-    try setFromCli(T, args, &seen, &result);
-    try setFromEnv(T, &seen, &result);
-    try setFromDefaults(T, &seen, &result);
+    try setFromCli(T, allocator, &arena, args, &seen, &result);
+    try setFromEnv(T, allocator, &arena, &seen, &result);
+    try setFromDefaults(T, allocator, &seen, &result);
 
     inline for (fields, seen) |field, seen_field| {
         if (!seen_field) {
@@ -48,7 +45,7 @@ pub fn parse(
                     "Missing required argument {s}\n",
                     .{field.name},
                 );
-                try printUsage(T, args[0]);
+                try printUsage(T, arena.allocator(), args[0]);
                 std.process.exit(1);
             }
         }
@@ -56,7 +53,7 @@ pub fn parse(
 
     if (errorCheck) |check| {
         if (!(try check(result, stderr))) {
-            try printUsage(T, args[0]);
+            try printUsage(T, arena.allocator(), args[0]);
             std.process.exit(1);
         }
     }
@@ -66,6 +63,8 @@ pub fn parse(
 
 fn setFromCli(
     T: type,
+    allocator: std.mem.Allocator,
+    arena: *std.heap.ArenaAllocator,
     args: []const []const u8,
     seen: []bool,
     result: *T,
@@ -77,14 +76,14 @@ fn setFromCli(
         if (std.mem.eql(u8, raw_arg, "-h") or
             std.mem.eql(u8, raw_arg, "--help"))
         {
-            try printUsage(T, args[0]);
+            try printUsage(T, arena.allocator(), args[0]);
             std.process.exit(0);
         }
 
         // TODO: Handle one-letter arguments
         if (!std.mem.startsWith(u8, raw_arg, "--")) {
             try stderr.print("Unknown argument: '{s}'\n", .{raw_arg});
-            try printUsage(T, args[0]);
+            try printUsage(T, arena.allocator(), args[0]);
             std.process.exit(1);
         }
 
@@ -103,7 +102,7 @@ fn setFromCli(
                             "Missing required value for argument {s} {s}\n",
                             .{ raw_arg, field.name },
                         );
-                        try printUsage(T, args[0]);
+                        try printUsage(T, arena.allocator(), args[0]);
                         std.process.exit(1);
                     }
                     switch (t) {
@@ -125,12 +124,18 @@ fn setFromCli(
         }
 
         try stderr.print("Unknown argument: '{s}'\n", .{raw_arg});
-        try printUsage(T, args[0]);
+        try printUsage(T, arena.allocator(), args[0]);
         std.process.exit(1);
     }
 }
 
-fn setFromEnv(T: type, seen: []bool, result: *T) !void {
+fn setFromEnv(
+    T: type,
+    allocator: std.mem.Allocator,
+    arena: *std.heap.ArenaAllocator,
+    seen: []bool,
+    result: *T,
+) !void {
     const a = arena.allocator();
     var env = try std.process.getEnvMap(a);
     defer env.deinit();
@@ -162,7 +167,12 @@ fn setFromEnv(T: type, seen: []bool, result: *T) !void {
     }
 }
 
-fn setFromDefaults(T: type, seen: []bool, result: *T) !void {
+fn setFromDefaults(
+    T: type,
+    allocator: std.mem.Allocator,
+    seen: []bool,
+    result: *T,
+) !void {
     inline for (@typeInfo(T).@"struct".fields, seen) |field, *seen_field| {
         if (!seen_field.*) {
             if (field.defaultValue()) |default| {
@@ -182,22 +192,21 @@ fn setFromDefaults(T: type, seen: []bool, result: *T) !void {
     }
 }
 
-fn printUsage(T: type, argv0: []const u8) !void {
-    const a = arena.allocator();
+fn printUsage(T: type, allocator: std.mem.Allocator, argv0: []const u8) !void {
     try stdout.print("Usage: {s} [options]\n\n", .{argv0});
     try stdout.print("Options:\n", .{});
     const fields = @typeInfo(T).@"struct".fields;
     inline for (fields) |field| {
         switch (@typeInfo(strip_optional(field.type))) {
             .bool => {
-                const flag_version = try a.dupe(u8, field.name);
-                defer a.free(flag_version);
+                const flag_version = try allocator.dupe(u8, field.name);
+                defer allocator.free(flag_version);
                 std.mem.replaceScalar(u8, flag_version, '_', '-');
                 try stdout.print("--{s}\n", .{flag_version});
             },
             else => {
-                const flag_version = try a.dupe(u8, field.name);
-                defer a.free(flag_version);
+                const flag_version = try allocator.dupe(u8, field.name);
+                defer allocator.free(flag_version);
                 std.mem.replaceScalar(u8, flag_version, '_', '-');
                 try stdout.print("--{s} {s}\n", .{ flag_version, field.name });
             },
@@ -211,10 +220,10 @@ fn strip_optional(T: type) type {
     return strip_optional(info.optional.child);
 }
 
-fn free_field(field: anytype) void {
+fn free_field(allocator: std.mem.Allocator, field: anytype) void {
     switch (@typeInfo(@TypeOf(field))) {
         .pointer => allocator.free(field),
-        .optional => if (field) |v| free_field(v),
+        .optional => if (field) |v| free_field(allocator, v),
         .bool, .int, .float, .@"enum" => {},
         else => @compileError("Disallowed struct field type."),
     }

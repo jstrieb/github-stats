@@ -15,7 +15,6 @@ var log_level: std.log.Level = switch (builtin.mode) {
     .Debug => .debug,
     else => .warn,
 };
-var allocator: std.mem.Allocator = undefined;
 
 fn logFn(
     comptime message_level: std.log.Level,
@@ -38,7 +37,24 @@ const Args = struct {
     excluded_langs: ?[]const u8 = null,
     exclude_private: bool = false,
 
-    pub fn deinit(self: @This()) void {
+    const Self = @This();
+
+    pub fn init(allocator: std.mem.Allocator) !Self {
+        return try argparse.parse(allocator, Self, struct {
+            fn errorCheck(a: Self, stderr: *std.Io.Writer) !bool {
+                if (a.api_key == null and a.json_input_file == null) {
+                    try stderr.print(
+                        "You must pass either an input file or an API key.\n",
+                        .{},
+                    );
+                    return false;
+                }
+                return true;
+            }
+        }.errorCheck);
+    }
+
+    pub fn deinit(self: Self, allocator: std.mem.Allocator) void {
         if (self.api_key) |s| allocator.free(s);
         if (self.json_input_file) |s| allocator.free(s);
         if (self.json_output_file) |s| allocator.free(s);
@@ -50,21 +66,10 @@ const Args = struct {
 pub fn main() !void {
     var gpa: std.heap.GeneralPurposeAllocator(.{}) = .init;
     defer _ = gpa.deinit();
-    allocator = gpa.allocator();
+    const allocator = gpa.allocator();
 
-    const args = try argparse.parse(allocator, Args, struct {
-        fn errorCheck(a: Args, stderr: *std.Io.Writer) !bool {
-            if (a.api_key == null and a.json_input_file == null) {
-                try stderr.print(
-                    "You must pass either an input file or an API key.\n",
-                    .{},
-                );
-                return false;
-            }
-            return true;
-        }
-    }.errorCheck);
-    defer args.deinit();
+    const args = try Args.init(allocator);
+    defer args.deinit(allocator);
     if (args.silent) {
         log_level = .err;
     } else if (args.verbose) {
@@ -114,7 +119,7 @@ pub fn main() !void {
         defer client.deinit();
         stats = try Statistics.init(&client, allocator);
     } else unreachable;
-    defer stats.deinit();
+    defer stats.deinit(allocator);
 
     if (args.json_output_file) |path| {
         std.log.info("Writing raw JSON data to '{s}'", .{path});
