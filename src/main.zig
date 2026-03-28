@@ -187,20 +187,7 @@ pub fn main() !void {
 
     var stats: Statistics = undefined;
     if (args.json_input_file) |path| {
-        std.log.info("Reading statistics from '{s}'", .{path});
-        const in =
-            if (std.mem.eql(u8, path, "-"))
-                std.fs.File.stdin()
-            else
-                try std.fs.cwd().openFile(path, .{});
-        // TODO: Don't close stdin
-        defer in.close();
-        var read_buffer: [64 * 1024]u8 = undefined;
-        var reader = in.reader(&read_buffer);
-        // TODO: Create a scanner from the reader instead of reading the whole
-        // file into memory
-        const data =
-            try (&reader.interface).allocRemaining(allocator, .unlimited);
+        const data = try readFile(allocator, path);
         defer allocator.free(data);
         stats = try Statistics.initFromJson(allocator, data);
     } else if (args.api_key) |api_key| {
@@ -212,27 +199,16 @@ pub fn main() !void {
     defer stats.deinit(allocator);
 
     if (args.json_output_file) |path| {
-        std.log.info("Writing raw JSON data to '{s}'", .{path});
-        const out =
-            if (std.mem.eql(u8, path, "-"))
-                std.fs.File.stdout()
-            else
-                try std.fs.cwd().createFile(path, .{});
-        // TODO: Don't close stdout
-        defer out.close();
-        var write_buffer: [64 * 1024]u8 = undefined;
-        var writer = out.writer(&write_buffer);
-
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
-        try writer.interface.writeAll(
+        try writeFile(
+            path,
             try std.json.Stringify.valueAlloc(
                 arena.allocator(),
                 stats,
                 .{ .whitespace = .indent_2 },
             ),
         );
-        try writer.interface.flush();
     }
 
     var aggregate_stats: struct {
@@ -295,48 +271,50 @@ pub fn main() !void {
         defer arena.deinit();
         const a = arena.allocator();
 
-        const out_data = try overview(a, aggregate_stats);
-        const path = args.overview_output_file orelse "overview.svg";
+        try writeFile(
+            args.overview_output_file orelse "overview.svg",
+            try overview(a, aggregate_stats),
+        );
 
-        std.log.info("Writing overview image data to '{s}'", .{path});
-        const out =
-            if (std.mem.eql(u8, path, "-"))
-                std.fs.File.stdout()
-            else
-                try std.fs.cwd().createFile(path, .{});
-        // TODO: Don't close stdout
-        defer out.close();
-        var write_buffer: [64 * 1024]u8 = undefined;
-        var writer = out.writer(&write_buffer);
-        try writer.interface.writeAll(out_data);
-        try writer.interface.flush();
-    }
-
-    {
-        var arena = std.heap.ArenaAllocator.init(allocator);
-        defer arena.deinit();
-        const a = arena.allocator();
-
-        const out_data = try languages(a, aggregate_stats);
-        const path = args.overview_output_file orelse "languages.svg";
-
-        std.log.info("Writing languages image data to '{s}'", .{path});
-        const out =
-            if (std.mem.eql(u8, path, "-"))
-                std.fs.File.stdout()
-            else
-                try std.fs.cwd().createFile(path, .{});
-        // TODO: Don't close stdout
-        defer out.close();
-        var write_buffer: [64 * 1024]u8 = undefined;
-        var writer = out.writer(&write_buffer);
-        try writer.interface.writeAll(out_data);
-        try writer.interface.flush();
+        try writeFile(
+            args.languages_output_file orelse "languages.svg",
+            try languages(a, aggregate_stats),
+        );
     }
 }
 
 test {
     std.testing.refAllDecls(@This());
+}
+
+fn readFile(allocator: std.mem.Allocator, path: []const u8) ![]const u8 {
+    std.log.info("Reading data from '{s}'", .{path});
+    const in =
+        if (std.mem.eql(u8, path, "-"))
+            std.fs.File.stdin()
+        else
+            try std.fs.cwd().openFile(path, .{});
+    defer if (!std.mem.eql(u8, path, "-")) in.close();
+    var read_buffer: [64 * 1024]u8 = undefined;
+    var reader = in.reader(&read_buffer);
+    return try (&reader.interface).allocRemaining(allocator, .unlimited);
+}
+
+fn writeFile(
+    path: []const u8,
+    data: []const u8,
+) !void {
+    std.log.info("Writing data to '{s}'", .{path});
+    const out =
+        if (std.mem.eql(u8, path, "-"))
+            std.fs.File.stdout()
+        else
+            try std.fs.cwd().createFile(path, .{});
+    defer if (!std.mem.eql(u8, path, "-")) out.close();
+    var write_buffer: [64 * 1024]u8 = undefined;
+    var writer = out.writer(&write_buffer);
+    try writer.interface.writeAll(data);
+    try writer.interface.flush();
 }
 
 fn decimalToString(allocator: std.mem.Allocator, n: anytype) ![]const u8 {

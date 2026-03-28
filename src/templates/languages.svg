@@ -51,7 +51,7 @@ ul {
 li {
   display: inline-flex;
   font-size: 12px;
-  margin-right: 2ch;
+  margin-right: 1ch;
   align-items: center;
   flex-wrap: nowrap;
   transform: translateX(-500%);
