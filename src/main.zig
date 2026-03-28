@@ -67,6 +67,91 @@ const Args = struct {
     }
 };
 
+fn overview(a: std.mem.Allocator, stats: anytype) ![]const u8 {
+    const template: []const u8 = @embedFile("templates/overview.svg");
+    var out_data = template;
+    inline for (
+        @typeInfo(@TypeOf(stats)).@"struct".fields,
+    ) |field| {
+        switch (@typeInfo(field.type)) {
+            .int => {
+                out_data = try std.mem.replaceOwned(
+                    u8,
+                    a,
+                    out_data,
+                    "{{ " ++ field.name ++ " }}",
+                    try decimalToString(a, @field(stats, field.name)),
+                );
+            },
+            .pointer => {
+                out_data = try std.mem.replaceOwned(
+                    u8,
+                    a,
+                    out_data,
+                    "{{ " ++ field.name ++ " }}",
+                    @field(stats, field.name),
+                );
+            },
+            .@"struct" => {},
+            else => comptime unreachable,
+        }
+    }
+    return out_data;
+}
+
+fn languages(a: std.mem.Allocator, stats: anytype) ![]const u8 {
+    const template: []const u8 = @embedFile("templates/languages.svg");
+    const progress = try a.alloc([]const u8, stats.languages.count());
+    const lang_list = try a.alloc([]const u8, stats.languages.count());
+    for (
+        stats.languages.keys(),
+        stats.languages.values(),
+        progress,
+        lang_list,
+        0..,
+    ) |language, count, *progress_s, *lang_s, i| {
+        const color = stats.language_colors.get(language);
+        const percent =
+            100 * if (stats.languages_total == 0)
+                0.0
+            else
+                @as(f64, @floatFromInt(count)) /
+                    @as(f64, @floatFromInt(stats.languages_total));
+        progress_s.* = try std.fmt.allocPrint(a,
+            \\<span style="
+            \\  background-color: {s}; 
+            \\  width: {d:.3}%;
+            \\" class="progress-item"></span>
+        , .{ color orelse "#000", percent });
+        lang_s.* = try std.fmt.allocPrint(a,
+            \\<li style="animation-delay: {d}ms;">
+            \\  <svg 
+            \\      xmlns="http://www.w3.org/2000/svg" 
+            \\      class="octicon"
+            \\      style="fill: {s};" 
+            \\      viewBox="0 0 16 16" 
+            \\      version="1.1" 
+            \\      width="16" 
+            \\      height="16"
+            \\  ><path 
+            \\      fill-rule="evenodd" 
+            \\      d="M8 4a4 4 0 100 8 4 4 0 000-8z"
+            \\  ></path></svg>
+            \\  <span class="lang">{s}</span>
+            \\  <span class="percent">{d:.2}%</span>
+            \\</li>
+            \\
+        , .{ (i + 1) * 150, color orelse "#000", language, percent });
+    }
+    return try std.mem.replaceOwned(u8, a, try std.mem.replaceOwned(
+        u8,
+        a,
+        template,
+        "{{ lang_list }}",
+        try std.mem.concat(a, u8, lang_list),
+    ), "{{ progress }}", try std.mem.concat(a, u8, progress));
+}
+
 pub fn main() !void {
     var gpa: std.heap.GeneralPurposeAllocator(.{}) = .init;
     defer _ = gpa.deinit();
@@ -206,44 +291,13 @@ pub fn main() !void {
     }{ .values = aggregate_stats.languages.values() });
 
     {
-        const template: []const u8 = @embedFile("templates/overview.svg");
-
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
         const a = arena.allocator();
 
-        var out_data = template;
-        inline for (
-            @typeInfo(@TypeOf(aggregate_stats)).@"struct".fields,
-        ) |field| {
-            switch (@typeInfo(field.type)) {
-                .int => {
-                    out_data = try std.mem.replaceOwned(
-                        u8,
-                        a,
-                        out_data,
-                        "{{ " ++ field.name ++ " }}",
-                        try decimalToString(
-                            a,
-                            @field(aggregate_stats, field.name),
-                        ),
-                    );
-                },
-                .pointer => {
-                    out_data = try std.mem.replaceOwned(
-                        u8,
-                        a,
-                        out_data,
-                        "{{ " ++ field.name ++ " }}",
-                        @field(aggregate_stats, field.name),
-                    );
-                },
-                .@"struct" => {},
-                else => comptime unreachable,
-            }
-        }
-
+        const out_data = try overview(a, aggregate_stats);
         const path = args.overview_output_file orelse "overview.svg";
+
         std.log.info("Writing overview image data to '{s}'", .{path});
         const out =
             if (std.mem.eql(u8, path, "-"))
@@ -254,72 +308,18 @@ pub fn main() !void {
         defer out.close();
         var write_buffer: [64 * 1024]u8 = undefined;
         var writer = out.writer(&write_buffer);
-
         try writer.interface.writeAll(out_data);
         try writer.interface.flush();
     }
 
     {
-        const template: []const u8 = @embedFile("templates/languages.svg");
-
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
         const a = arena.allocator();
 
-        const progress =
-            try a.alloc([]const u8, aggregate_stats.languages.count());
-        const lang_list =
-            try a.alloc([]const u8, aggregate_stats.languages.count());
-        for (
-            aggregate_stats.languages.keys(),
-            aggregate_stats.languages.values(),
-            progress,
-            lang_list,
-            0..,
-        ) |language, count, *progress_s, *lang_s, i| {
-            const color = aggregate_stats.language_colors.get(language);
-            const percent =
-                100 * if (aggregate_stats.languages_total == 0)
-                    0.0
-                else
-                    @as(f64, @floatFromInt(count)) /
-                        @as(f64, @floatFromInt(aggregate_stats.languages_total));
-            progress_s.* = try std.fmt.allocPrint(a,
-                \\<span style="
-                \\  background-color: {s}; 
-                \\  width: {d:.3}%;
-                \\" class="progress-item"></span>
-            , .{ color orelse "#000", percent });
-            lang_s.* = try std.fmt.allocPrint(a,
-                \\<li style="animation-delay: {d}ms;">
-                \\  <svg 
-                \\      xmlns="http://www.w3.org/2000/svg" 
-                \\      class="octicon"
-                \\      style="fill: {s};" 
-                \\      viewBox="0 0 16 16" 
-                \\      version="1.1" 
-                \\      width="16" 
-                \\      height="16"
-                \\  ><path 
-                \\      fill-rule="evenodd" 
-                \\      d="M8 4a4 4 0 100 8 4 4 0 000-8z"
-                \\  ></path></svg>
-                \\  <span class="lang">{s}</span>
-                \\  <span class="percent">{d:.2}%</span>
-                \\</li>
-                \\
-            , .{ (i + 1) * 150, color orelse "#000", language, percent });
-        }
-        const out_data =
-            try std.mem.replaceOwned(u8, a, try std.mem.replaceOwned(
-                u8,
-                a,
-                template,
-                "{{ lang_list }}",
-                try std.mem.concat(a, u8, lang_list),
-            ), "{{ progress }}", try std.mem.concat(a, u8, progress));
-
+        const out_data = try languages(a, aggregate_stats);
         const path = args.overview_output_file orelse "languages.svg";
+
         std.log.info("Writing languages image data to '{s}'", .{path});
         const out =
             if (std.mem.eql(u8, path, "-"))
@@ -330,7 +330,6 @@ pub fn main() !void {
         defer out.close();
         var write_buffer: [64 * 1024]u8 = undefined;
         var writer = out.writer(&write_buffer);
-
         try writer.interface.writeAll(out_data);
         try writer.interface.flush();
     }
