@@ -108,6 +108,7 @@ pub fn main() !void {
                 std.fs.File.stdin()
             else
                 try std.fs.cwd().openFile(path, .{});
+        // TODO: Don't close stdin
         defer in.close();
         var read_buffer: [64 * 1024]u8 = undefined;
         var reader = in.reader(&read_buffer);
@@ -132,6 +133,7 @@ pub fn main() !void {
                 std.fs.File.stdout()
             else
                 try std.fs.cwd().createFile(path, .{});
+        // TODO: Don't close stdout
         defer out.close();
         var write_buffer: [64 * 1024]u8 = undefined;
         var writer = out.writer(&write_buffer);
@@ -150,7 +152,10 @@ pub fn main() !void {
 
     var aggregate_stats: struct {
         languages: std.StringArrayHashMap(u64),
+        language_colors: std.StringArrayHashMap([]const u8),
         contributions: usize,
+        name: []const u8,
+        languages_total: usize = 0,
         stars: usize = 0,
         forks: usize = 0,
         lines_changed: usize = 0,
@@ -163,8 +168,11 @@ pub fn main() !void {
             stats.pr_contributions +
             stats.review_contributions,
         .languages = .init(allocator),
+        .language_colors = .init(allocator),
+        .name = stats.name,
     };
     defer aggregate_stats.languages.deinit();
+    defer aggregate_stats.language_colors.deinit();
     for (stats.repositories) |repository| {
         if (glob.matchAny(excluded_repos orelse &.{}, repository.name) or
             (args.exclude_private and repository.private))
@@ -177,20 +185,33 @@ pub fn main() !void {
         aggregate_stats.views += repository.views;
         aggregate_stats.repos += 1;
         if (repository.languages) |langs| for (langs) |language| {
+            if (language.color) |color| {
+                try aggregate_stats.language_colors.put(language.name, color);
+            }
             if (glob.matchAny(excluded_langs orelse &.{}, language.name)) {
                 continue;
             }
             var total = aggregate_stats.languages.get(language.name) orelse 0;
             total += language.size;
             try aggregate_stats.languages.put(language.name, total);
+            aggregate_stats.languages_total += language.size;
         };
     }
+    aggregate_stats.languages.sort(struct {
+        values: @TypeOf(aggregate_stats.languages.values()),
+        pub fn lessThan(self: @This(), a: usize, b: usize) bool {
+            // Sort in reverse order
+            return self.values[a] >= self.values[b];
+        }
+    }{ .values = aggregate_stats.languages.values() });
 
     {
         const template: []const u8 = @embedFile("templates/overview.svg");
+
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
         const a = arena.allocator();
+
         var out_data = template;
         inline for (
             @typeInfo(@TypeOf(aggregate_stats)).@"struct".fields,
@@ -208,7 +229,17 @@ pub fn main() !void {
                         ),
                     );
                 },
-                else => {},
+                .pointer => {
+                    out_data = try std.mem.replaceOwned(
+                        u8,
+                        a,
+                        out_data,
+                        "{{ " ++ field.name ++ " }}",
+                        @field(aggregate_stats, field.name),
+                    );
+                },
+                .@"struct" => {},
+                else => comptime unreachable,
             }
         }
 
@@ -219,6 +250,83 @@ pub fn main() !void {
                 std.fs.File.stdout()
             else
                 try std.fs.cwd().createFile(path, .{});
+        // TODO: Don't close stdout
+        defer out.close();
+        var write_buffer: [64 * 1024]u8 = undefined;
+        var writer = out.writer(&write_buffer);
+
+        try writer.interface.writeAll(out_data);
+        try writer.interface.flush();
+    }
+
+    {
+        const template: []const u8 = @embedFile("templates/languages.svg");
+
+        var arena = std.heap.ArenaAllocator.init(allocator);
+        defer arena.deinit();
+        const a = arena.allocator();
+
+        const progress =
+            try a.alloc([]const u8, aggregate_stats.languages.count());
+        const lang_list =
+            try a.alloc([]const u8, aggregate_stats.languages.count());
+        for (
+            aggregate_stats.languages.keys(),
+            aggregate_stats.languages.values(),
+            progress,
+            lang_list,
+            0..,
+        ) |language, count, *progress_s, *lang_s, i| {
+            const color = aggregate_stats.language_colors.get(language);
+            const percent =
+                100 * if (aggregate_stats.languages_total == 0)
+                    0.0
+                else
+                    @as(f64, @floatFromInt(count)) /
+                        @as(f64, @floatFromInt(aggregate_stats.languages_total));
+            progress_s.* = try std.fmt.allocPrint(a,
+                \\<span style="
+                \\  background-color: {s}; 
+                \\  width: {d:.3}%;
+                \\" class="progress-item"></span>
+            , .{ color orelse "#000", percent });
+            lang_s.* = try std.fmt.allocPrint(a,
+                \\<li style="animation-delay: {d}ms;">
+                \\  <svg 
+                \\      xmlns="http://www.w3.org/2000/svg" 
+                \\      class="octicon"
+                \\      style="fill: {s};" 
+                \\      viewBox="0 0 16 16" 
+                \\      version="1.1" 
+                \\      width="16" 
+                \\      height="16"
+                \\  ><path 
+                \\      fill-rule="evenodd" 
+                \\      d="M8 4a4 4 0 100 8 4 4 0 000-8z"
+                \\  ></path></svg>
+                \\  <span class="lang">{s}</span>
+                \\  <span class="percent">{d:.2}%</span>
+                \\</li>
+                \\
+            , .{ (i + 1) * 150, color orelse "#000", language, percent });
+        }
+        const out_data =
+            try std.mem.replaceOwned(u8, a, try std.mem.replaceOwned(
+                u8,
+                a,
+                template,
+                "{{ lang_list }}",
+                try std.mem.concat(a, u8, lang_list),
+            ), "{{ progress }}", try std.mem.concat(a, u8, progress));
+
+        const path = args.overview_output_file orelse "languages.svg";
+        std.log.info("Writing languages image data to '{s}'", .{path});
+        const out =
+            if (std.mem.eql(u8, path, "-"))
+                std.fs.File.stdout()
+            else
+                try std.fs.cwd().createFile(path, .{});
+        // TODO: Don't close stdout
         defer out.close();
         var write_buffer: [64 * 1024]u8 = undefined;
         var writer = out.writer(&write_buffer);
@@ -235,16 +343,16 @@ test {
 fn decimalToString(allocator: std.mem.Allocator, n: anytype) ![]const u8 {
     const info = @typeInfo(@TypeOf(n));
     if (info != .int or info.int.signedness != .unsigned) {
-        @compileError("Only implemented for unsigned integer numbers.");
+        @compileError("Only implemented for unsigned integers.");
     }
-    if (n == 0) {
-        return try allocator.dupe(u8, "0");
-    }
+
     const s = try std.fmt.allocPrint(allocator, "{d}", .{n});
     defer allocator.free(s);
     const digits = s.len;
     const commas = (digits - 1) / 3;
     const result = try allocator.alloc(u8, digits + commas);
+    errdefer comptime unreachable;
+
     var i: usize = result.len - 1;
     var j: usize = s.len - 1;
     while (true) {
