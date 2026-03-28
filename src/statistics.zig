@@ -322,30 +322,40 @@ fn get_repos(
                 .views = 0,
                 .lines_changed = 0,
             };
-
+            errdefer repository.deinit(allocator);
             if (raw_repo.languages) |repo_languages| {
-                // TODO: Properly free partially initialized memory when any try
-                // fails in this block
                 if (repo_languages.edges) |raw_languages| {
                     repository.languages = try allocator.alloc(
                         Language,
                         raw_languages.len,
                     );
+                    errdefer {
+                        allocator.free(repository.languages.?);
+                        repository.languages = null;
+                    }
                     for (
                         raw_languages,
                         repository.languages.?,
-                    ) |raw, *language| {
+                        0..,
+                    ) |raw, *language, i| {
+                        errdefer {
+                            for (0..i, repository.languages.?) |_, l| {
+                                allocator.free(l.name);
+                                if (l.color) |c| allocator.free(c);
+                            }
+                        }
                         language.* = .{
                             .name = try allocator.dupe(u8, raw.node.name),
                             .size = raw.size,
                         };
+                        errdefer allocator.free(language.name);
                         if (raw.node.color) |color| {
                             language.color = try allocator.dupe(u8, color);
                         }
+                        errdefer if (language.color) |c| allocator.free(c);
                     }
                 }
             }
-            errdefer repository.deinit(allocator);
 
             std.log.info(
                 "Getting views for {s}...",
@@ -378,13 +388,19 @@ fn get_repos(
 
             _ = try repository.get_lines_changed(arena, client, user);
 
-            try repositories.append(allocator, repository);
             try seen.put(raw_repo.nameWithOwner, true);
+            try repositories.append(allocator, repository);
         }
     }
 
-    const list = try repositories.toOwnedSlice(allocator);
-    std.sort.pdq(Repository, list, {}, struct {
+    result.repositories = try repositories.toOwnedSlice(allocator);
+    errdefer {
+        for (result.repositories) |repository| {
+            repository.deinit(allocator);
+        }
+        allocator.free(result.repositories);
+    }
+    std.sort.pdq(Repository, result.repositories, {}, struct {
         pub fn lessThanFn(_: void, lhs: Repository, rhs: Repository) bool {
             if (rhs.views == lhs.views) {
                 return rhs.stars + rhs.forks < lhs.stars + lhs.forks;
@@ -397,7 +413,6 @@ fn get_repos(
     errdefer allocator.free(result.user);
     result.name = try allocator.dupe(u8, name orelse user);
     errdefer allocator.free(result.name);
-    result.repositories = list;
     return result;
 }
 
@@ -460,11 +475,13 @@ fn get_lines_changed(
     }
 }
 
+// May not correctly free memory if there are errors during copying
 fn deepcopy(a: std.mem.Allocator, o: anytype) !@TypeOf(o) {
     return switch (@typeInfo(@TypeOf(o))) {
         .pointer => |p| switch (p.size) {
             .slice => v: {
                 const result = try a.dupe(p.child, o);
+                errdefer a.free(result);
                 for (o, result) |src, *dest| {
                     dest.* = try deepcopy(a, src);
                 }

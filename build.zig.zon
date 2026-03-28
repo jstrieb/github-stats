@@ -10,6 +10,5 @@
         "src",
         "LICENSE",
         "README.md",
-        "templates",
     },
 }

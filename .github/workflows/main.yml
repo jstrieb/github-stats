@@ -24,6 +24,7 @@ jobs:
       run: |
         git config --global user.name "jstrieb/github-stats"
         git config --global user.email "github-stats[bot]@jstrieb.github.io"
+        # Push generated files to the generated branch
         git checkout generated || git checkout -b generated
         git merge master
 

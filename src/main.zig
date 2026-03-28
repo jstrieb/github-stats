@@ -67,12 +67,11 @@ const Args = struct {
     }
 };
 
-fn overview(a: std.mem.Allocator, stats: anytype) ![]const u8 {
+fn overview(arena: *std.heap.ArenaAllocator, stats: anytype) ![]const u8 {
+    const a = arena.allocator();
     const template: []const u8 = @embedFile("templates/overview.svg");
     var out_data = template;
-    inline for (
-        @typeInfo(@TypeOf(stats)).@"struct".fields,
-    ) |field| {
+    inline for (@typeInfo(@TypeOf(stats)).@"struct".fields) |field| {
         switch (@typeInfo(field.type)) {
             .int => {
                 out_data = try std.mem.replaceOwned(
@@ -99,7 +98,8 @@ fn overview(a: std.mem.Allocator, stats: anytype) ![]const u8 {
     return out_data;
 }
 
-fn languages(a: std.mem.Allocator, stats: anytype) ![]const u8 {
+fn languages(arena: *std.heap.ArenaAllocator, stats: anytype) ![]const u8 {
+    const a = arena.allocator();
     const template: []const u8 = @embedFile("templates/languages.svg");
     const progress = try a.alloc([]const u8, stats.languages.count());
     const lang_list = try a.alloc([]const u8, stats.languages.count());
@@ -246,11 +246,11 @@ pub fn main() !void {
         aggregate_stats.views += repository.views;
         aggregate_stats.repos += 1;
         if (repository.languages) |langs| for (langs) |language| {
-            if (language.color) |color| {
-                try aggregate_stats.language_colors.put(language.name, color);
-            }
             if (glob.matchAny(excluded_langs orelse &.{}, language.name)) {
                 continue;
+            }
+            if (language.color) |color| {
+                try aggregate_stats.language_colors.put(language.name, color);
             }
             var total = aggregate_stats.languages.get(language.name) orelse 0;
             total += language.size;
@@ -262,23 +262,22 @@ pub fn main() !void {
         values: @TypeOf(aggregate_stats.languages.values()),
         pub fn lessThan(self: @This(), a: usize, b: usize) bool {
             // Sort in reverse order
-            return self.values[a] >= self.values[b];
+            return self.values[a] > self.values[b];
         }
     }{ .values = aggregate_stats.languages.values() });
 
     {
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
-        const a = arena.allocator();
 
         try writeFile(
             args.overview_output_file orelse "overview.svg",
-            try overview(a, aggregate_stats),
+            try overview(&arena, aggregate_stats),
         );
 
         try writeFile(
             args.languages_output_file orelse "languages.svg",
-            try languages(a, aggregate_stats),
+            try languages(&arena, aggregate_stats),
         );
     }
 }
