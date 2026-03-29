@@ -515,7 +515,7 @@ fn get_lines_changed(
                 // Exponential backoff (in expectation) with jitter
                 item.delay +=
                     std.crypto.random.intRangeAtMost(i64, 2, item.delay);
-                item.delay = @min(item.delay, 240);
+                item.delay = @min(item.delay, 600);
                 try q.add(item);
             },
             else => |status| {
