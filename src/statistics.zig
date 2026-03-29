@@ -69,6 +69,7 @@ const Repository = struct {
                 if (!std.mem.eql(u8, o.author.login, user)) {
                     continue;
                 }
+                self.lines_changed = 0;
                 for (o.weeks) |week| {
                     self.lines_changed += week.a;
                     self.lines_changed += week.d;
