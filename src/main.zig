@@ -42,6 +42,8 @@ const Args = struct {
     exclude_private: bool = false,
     overview_output_file: ?[]const u8 = null,
     languages_output_file: ?[]const u8 = null,
+    overview_template: ?[]const u8 = null,
+    languages_template: ?[]const u8 = null,
 
     const Self = @This();
 
@@ -68,12 +70,17 @@ const Args = struct {
         if (self.excluded_langs) |s| allocator.free(s);
         if (self.overview_output_file) |s| allocator.free(s);
         if (self.languages_output_file) |s| allocator.free(s);
+        if (self.overview_template) |s| allocator.free(s);
+        if (self.languages_template) |s| allocator.free(s);
     }
 };
 
-fn overview(arena: *std.heap.ArenaAllocator, stats: anytype) ![]const u8 {
+fn overview(
+    arena: *std.heap.ArenaAllocator,
+    stats: anytype,
+    template: []const u8,
+) ![]const u8 {
     const a = arena.allocator();
-    const template: []const u8 = @embedFile("templates/overview.svg");
     var out_data = template;
     // Vulnerable to template injection. In practice, this should never happen.
     inline for (@typeInfo(@TypeOf(stats)).@"struct".fields) |field| {
@@ -103,9 +110,12 @@ fn overview(arena: *std.heap.ArenaAllocator, stats: anytype) ![]const u8 {
     return out_data;
 }
 
-fn languages(arena: *std.heap.ArenaAllocator, stats: anytype) ![]const u8 {
+fn languages(
+    arena: *std.heap.ArenaAllocator,
+    stats: anytype,
+    template: []const u8,
+) ![]const u8 {
     const a = arena.allocator();
-    const template: []const u8 = @embedFile("templates/languages.svg");
     const progress = try a.alloc([]const u8, stats.languages.count());
     const lang_list = try a.alloc([]const u8, stats.languages.count());
     for (
@@ -280,12 +290,26 @@ pub fn main() !void {
 
         try writeFile(
             args.overview_output_file orelse "overview.svg",
-            try overview(&arena, aggregate_stats),
+            try overview(
+                &arena,
+                aggregate_stats,
+                if (args.overview_template) |template|
+                    try readFile(arena.allocator(), template)
+                else
+                    @embedFile("templates/overview.svg"),
+            ),
         );
 
         try writeFile(
             args.languages_output_file orelse "languages.svg",
-            try languages(&arena, aggregate_stats),
+            try languages(
+                &arena,
+                aggregate_stats,
+                if (args.languages_template) |template|
+                    try readFile(arena.allocator(), template)
+                else
+                    @embedFile("templates/languages.svg"),
+            ),
         );
     }
 }
