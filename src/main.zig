@@ -9,6 +9,9 @@ const Statistics = @import("statistics.zig");
 
 pub const std_options: std.Options = .{
     .logFn = logFn,
+    // Even though we change it later, this is necessary to ensure that debug
+    // logs aren't stripped in release builds.
+    .log_level = .debug,
 };
 
 var log_level: std.log.Level = switch (builtin.mode) {
@@ -32,6 +35,7 @@ const Args = struct {
     json_input_file: ?[]const u8 = null,
     json_output_file: ?[]const u8 = null,
     silent: bool = false,
+    debug: bool = false,
     verbose: bool = false,
     excluded_repos: ?[]const u8 = null,
     excluded_langs: ?[]const u8 = null,
@@ -163,8 +167,10 @@ pub fn main() !void {
     defer args.deinit(allocator);
     if (args.silent) {
         log_level = .err;
-    } else if (args.verbose) {
+    } else if (args.debug) {
         log_level = .debug;
+    } else if (args.verbose) {
+        log_level = .info;
     }
     const excluded_repos = if (args.excluded_repos) |excluded| excluded: {
         var list = try std.ArrayList([]const u8).initCapacity(allocator, 16);
