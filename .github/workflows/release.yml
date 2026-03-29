@@ -1,0 +1,38 @@
+name: Build Release Binaries
+
+on:
+  push:
+    tags: 
+      - '*'
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash -euxo pipefail {0}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+
+    - uses: mlugg/setup-zig@v2
+      with:
+        version: 0.15.2
+
+    - name: Build
+      run: |
+        zig build release
+
+    - name: Upload Release Artifacts
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        TAG: ${{ github.ref_name }}
+      run: |
+        (
+          cd zig-out/bin/
+          gh release create \
+            "${TAG}" \
+            --title "${TAG} Release" \
+            *
+        )
