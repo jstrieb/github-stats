@@ -174,13 +174,15 @@ fn get_basic_info(
 }
 
 fn get_repos_by_year(
-    allocator: std.mem.Allocator,
-    arena: *std.heap.ArenaAllocator,
-    client: *HttpClient,
-    user: []const u8,
-    result: *Statistics,
-    seen: *std.StringHashMap(bool),
-    repositories: *std.ArrayList(Repository),
+    context: struct {
+        allocator: std.mem.Allocator,
+        arena: *std.heap.ArenaAllocator,
+        client: *HttpClient,
+        user: []const u8,
+        result: *Statistics,
+        seen: *std.StringHashMap(bool),
+        repositories: *std.ArrayList(Repository),
+    },
     year: usize,
     start_month: usize,
     months: usize,
@@ -189,7 +191,7 @@ fn get_repos_by_year(
         "Getting {d} month{s} of data starting from {d}/{d}...",
         .{ months, if (months != 1) "s" else "", start_month + 1, year },
     );
-    var response, var status = try client.graphql(
+    var response, var status = try context.client.graphql(
         \\query ($from: DateTime, $to: DateTime) {
         \\  viewer {
         \\    contributionsCollection(from: $from, to: $to) {
@@ -224,12 +226,12 @@ fn get_repos_by_year(
     ,
         .{
             .from = try std.fmt.allocPrint(
-                arena.allocator(),
+                context.arena.allocator(),
                 "{d}-{d:02}-01T00:00:00Z",
                 .{ year, start_month + 1 },
             ),
             .to = try std.fmt.allocPrint(
-                arena.allocator(),
+                context.arena.allocator(),
                 "{d}-{d:02}-01T00:00:00Z",
                 .{
                     year + (start_month + months) / 12,
@@ -245,7 +247,7 @@ fn get_repos_by_year(
         );
         return error.RequestFailed;
     }
-    const viewer = (std.json.parseFromSliceLeaky(
+    const stats = (try std.json.parseFromSliceLeaky(
         struct { data: struct { viewer: struct {
             contributionsCollection: struct {
                 totalRepositoryContributions: u32,
@@ -272,15 +274,10 @@ fn get_repos_by_year(
                 },
             },
         } } },
-        arena.allocator(),
+        context.arena.allocator(),
         response,
         .{ .ignore_unknown_fields = true },
-    ) catch |err| {
-        std.debug.print("{s}\n", .{response});
-        return err;
-    }).data.viewer;
-
-    const stats = viewer.contributionsCollection;
+    )).data.viewer.contributionsCollection;
     std.log.info(
         "Parsed {d} total repositories from {d}",
         .{ stats.commitContributionsByRepository.len, year },
@@ -292,13 +289,7 @@ fn get_repos_by_year(
             if (months % factor == 0) {
                 for (0..factor) |i| {
                     try get_repos_by_year(
-                        allocator,
-                        arena,
-                        client,
-                        user,
-                        result,
-                        seen,
-                        repositories,
+                        context,
                         year,
                         start_month + (months / factor) * i,
                         months / factor,
@@ -315,16 +306,16 @@ fn get_repos_by_year(
         }
     }
 
-    result.repo_contributions += stats.totalRepositoryContributions;
-    result.issue_contributions += stats.totalIssueContributions;
-    result.commit_contributions += stats.totalCommitContributions;
-    result.pr_contributions += stats.totalPullRequestContributions;
-    result.review_contributions +=
+    context.result.repo_contributions += stats.totalRepositoryContributions;
+    context.result.issue_contributions += stats.totalIssueContributions;
+    context.result.commit_contributions += stats.totalCommitContributions;
+    context.result.pr_contributions += stats.totalPullRequestContributions;
+    context.result.review_contributions +=
         stats.totalPullRequestReviewContributions;
 
     for (stats.commitContributionsByRepository) |x| {
         const raw_repo = x.repository;
-        if (seen.get(raw_repo.nameWithOwner) orelse false) {
+        if (context.seen.get(raw_repo.nameWithOwner) orelse false) {
             std.log.debug(
                 "Skipping {s} (seen)",
                 .{raw_repo.nameWithOwner},
@@ -332,7 +323,7 @@ fn get_repos_by_year(
             continue;
         }
         var repository = Repository{
-            .name = try allocator.dupe(u8, raw_repo.nameWithOwner),
+            .name = try context.allocator.dupe(u8, raw_repo.nameWithOwner),
             .stars = raw_repo.stargazerCount,
             .forks = raw_repo.forkCount,
             .private = raw_repo.isPrivate,
@@ -340,15 +331,15 @@ fn get_repos_by_year(
             .views = 0,
             .lines_changed = 0,
         };
-        errdefer repository.deinit(allocator);
+        errdefer repository.deinit(context.allocator);
         if (raw_repo.languages) |repo_languages| {
             if (repo_languages.edges) |raw_languages| {
-                repository.languages = try allocator.alloc(
+                repository.languages = try context.allocator.alloc(
                     Language,
                     raw_languages.len,
                 );
                 errdefer {
-                    allocator.free(repository.languages.?);
+                    context.allocator.free(repository.languages.?);
                     repository.languages = null;
                 }
                 for (
@@ -358,19 +349,19 @@ fn get_repos_by_year(
                 ) |raw, *language, i| {
                     errdefer {
                         for (0..i, repository.languages.?) |_, l| {
-                            allocator.free(l.name);
-                            if (l.color) |c| allocator.free(c);
+                            context.allocator.free(l.name);
+                            if (l.color) |c| context.allocator.free(c);
                         }
                     }
                     language.* = .{
-                        .name = try allocator.dupe(u8, raw.node.name),
+                        .name = try context.allocator.dupe(u8, raw.node.name),
                         .size = raw.size,
                     };
-                    errdefer allocator.free(language.name);
+                    errdefer context.allocator.free(language.name);
                     if (raw.node.color) |color| {
-                        language.color = try allocator.dupe(u8, color);
+                        language.color = try context.allocator.dupe(u8, color);
                     }
-                    errdefer if (language.color) |c| allocator.free(c);
+                    errdefer if (language.color) |c| context.allocator.free(c);
                 }
             }
         }
@@ -379,9 +370,9 @@ fn get_repos_by_year(
             "Getting views for {s}...",
             .{raw_repo.nameWithOwner},
         );
-        response, status = try client.rest(
+        response, status = try context.client.rest(
             try std.mem.concat(
-                arena.allocator(),
+                context.arena.allocator(),
                 u8,
                 &.{
                     "https://api.github.com/repos/",
@@ -393,7 +384,7 @@ fn get_repos_by_year(
         if (status == .ok) {
             repository.views = (try std.json.parseFromSliceLeaky(
                 struct { count: u32 },
-                arena.allocator(),
+                context.arena.allocator(),
                 response,
                 .{ .ignore_unknown_fields = true },
             )).count;
@@ -404,10 +395,14 @@ fn get_repos_by_year(
             );
         }
 
-        _ = try repository.get_lines_changed(arena, client, user);
+        _ = try repository.get_lines_changed(
+            context.arena,
+            context.client,
+            context.user,
+        );
 
-        try seen.put(raw_repo.nameWithOwner, true);
-        try repositories.append(allocator, repository);
+        try context.seen.put(raw_repo.nameWithOwner, true);
+        try context.repositories.append(context.allocator, repository);
     }
 }
 
@@ -440,18 +435,15 @@ fn get_repos(
         std.log.info("Getting data for user {s}...", .{user});
     }
     for (years) |year| {
-        try get_repos_by_year(
-            allocator,
-            arena,
-            client,
-            user,
-            &result,
-            &seen,
-            &repositories,
-            year,
-            0,
-            12,
-        );
+        try get_repos_by_year(.{
+            .allocator = allocator,
+            .arena = arena,
+            .client = client,
+            .user = user,
+            .result = &result,
+            .seen = &seen,
+            .repositories = &repositories,
+        }, year, 0, 12);
     }
 
     result.repositories = try repositories.toOwnedSlice(allocator);

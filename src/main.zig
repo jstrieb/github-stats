@@ -71,6 +71,7 @@ fn overview(arena: *std.heap.ArenaAllocator, stats: anytype) ![]const u8 {
     const a = arena.allocator();
     const template: []const u8 = @embedFile("templates/overview.svg");
     var out_data = template;
+    // Vulnerable to template injection. In practice, this should never happen.
     inline for (@typeInfo(@TypeOf(stats)).@"struct".fields) |field| {
         switch (@typeInfo(field.type)) {
             .int => {
@@ -143,6 +144,7 @@ fn languages(arena: *std.heap.ArenaAllocator, stats: anytype) ![]const u8 {
             \\
         , .{ (i + 1) * 150, color orelse "#000", language, percent });
     }
+    // Vulnerable to template injection. In practice, this should never happen.
     return try std.mem.replaceOwned(u8, a, try std.mem.replaceOwned(
         u8,
         a,
