@@ -173,6 +173,244 @@ fn get_basic_info(
     };
 }
 
+fn get_repos_by_year(
+    allocator: std.mem.Allocator,
+    arena: *std.heap.ArenaAllocator,
+    client: *HttpClient,
+    user: []const u8,
+    result: *Statistics,
+    seen: *std.StringHashMap(bool),
+    repositories: *std.ArrayList(Repository),
+    year: usize,
+    start_month: usize,
+    months: usize,
+) !void {
+    std.log.info(
+        "Getting {d} month{s} of data starting from {d}/{d}...",
+        .{ months, if (months != 1) "s" else "", start_month + 1, year },
+    );
+    var response, var status = try client.graphql(
+        \\query ($from: DateTime, $to: DateTime) {
+        \\  viewer {
+        \\    contributionsCollection(from: $from, to: $to) {
+        \\      totalRepositoryContributions
+        \\      totalIssueContributions
+        \\      totalCommitContributions
+        \\      totalPullRequestContributions
+        \\      totalPullRequestReviewContributions
+        \\      commitContributionsByRepository(maxRepositories: 100) {
+        \\        repository {
+        \\          nameWithOwner
+        \\          stargazerCount
+        \\          forkCount
+        \\          isPrivate
+        \\          languages(
+        \\              first: 100,
+        \\              orderBy: { direction: DESC, field: SIZE }
+        \\          ) {
+        \\            edges {
+        \\              size
+        \\              node {
+        \\                name
+        \\                color
+        \\              }
+        \\            }
+        \\          }
+        \\        }
+        \\      }
+        \\    }
+        \\  }
+        \\}
+    ,
+        .{
+            .from = try std.fmt.allocPrint(
+                arena.allocator(),
+                "{d}-{d:02}-01T00:00:00Z",
+                .{ year, start_month + 1 },
+            ),
+            .to = try std.fmt.allocPrint(
+                arena.allocator(),
+                "{d}-{d:02}-01T00:00:00Z",
+                .{
+                    year + (start_month + months) / 12,
+                    (start_month + months) % 12 + 1,
+                },
+            ),
+        },
+    );
+    if (status != .ok) {
+        std.log.err(
+            "Failed to get data from {d} ({?s})",
+            .{ year, status.phrase() },
+        );
+        return error.RequestFailed;
+    }
+    const viewer = (std.json.parseFromSliceLeaky(
+        struct { data: struct { viewer: struct {
+            contributionsCollection: struct {
+                totalRepositoryContributions: u32,
+                totalIssueContributions: u32,
+                totalCommitContributions: u32,
+                totalPullRequestContributions: u32,
+                totalPullRequestReviewContributions: u32,
+                commitContributionsByRepository: []struct {
+                    repository: struct {
+                        nameWithOwner: []const u8,
+                        stargazerCount: u32,
+                        forkCount: u32,
+                        isPrivate: bool,
+                        languages: ?struct {
+                            edges: ?[]struct {
+                                size: u32,
+                                node: struct {
+                                    name: []const u8,
+                                    color: ?[]const u8,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        } } },
+        arena.allocator(),
+        response,
+        .{ .ignore_unknown_fields = true },
+    ) catch |err| {
+        std.debug.print("{s}\n", .{response});
+        return err;
+    }).data.viewer;
+
+    const stats = viewer.contributionsCollection;
+    std.log.info(
+        "Parsed {d} total repositories from {d}",
+        .{ stats.commitContributionsByRepository.len, year },
+    );
+
+    const limit = 100;
+    if (stats.commitContributionsByRepository.len >= limit) {
+        for (&[_]usize{ 2, 3 }) |factor| {
+            if (months % factor == 0) {
+                for (0..factor) |i| {
+                    try get_repos_by_year(
+                        allocator,
+                        arena,
+                        client,
+                        user,
+                        result,
+                        seen,
+                        repositories,
+                        year,
+                        start_month + (months / factor) * i,
+                        months / factor,
+                    );
+                }
+                return;
+            }
+        } else {
+            std.log.warn(
+                "More than {d} repos returned for {d}/{d}. " ++
+                    "Some data may be omitted due to GitHub API limitations.",
+                .{ limit, start_month + 1, year },
+            );
+        }
+    }
+
+    result.repo_contributions += stats.totalRepositoryContributions;
+    result.issue_contributions += stats.totalIssueContributions;
+    result.commit_contributions += stats.totalCommitContributions;
+    result.pr_contributions += stats.totalPullRequestContributions;
+    result.review_contributions +=
+        stats.totalPullRequestReviewContributions;
+
+    for (stats.commitContributionsByRepository) |x| {
+        const raw_repo = x.repository;
+        if (seen.get(raw_repo.nameWithOwner) orelse false) {
+            std.log.debug(
+                "Skipping {s} (seen)",
+                .{raw_repo.nameWithOwner},
+            );
+            continue;
+        }
+        var repository = Repository{
+            .name = try allocator.dupe(u8, raw_repo.nameWithOwner),
+            .stars = raw_repo.stargazerCount,
+            .forks = raw_repo.forkCount,
+            .private = raw_repo.isPrivate,
+            .languages = null,
+            .views = 0,
+            .lines_changed = 0,
+        };
+        errdefer repository.deinit(allocator);
+        if (raw_repo.languages) |repo_languages| {
+            if (repo_languages.edges) |raw_languages| {
+                repository.languages = try allocator.alloc(
+                    Language,
+                    raw_languages.len,
+                );
+                errdefer {
+                    allocator.free(repository.languages.?);
+                    repository.languages = null;
+                }
+                for (
+                    raw_languages,
+                    repository.languages.?,
+                    0..,
+                ) |raw, *language, i| {
+                    errdefer {
+                        for (0..i, repository.languages.?) |_, l| {
+                            allocator.free(l.name);
+                            if (l.color) |c| allocator.free(c);
+                        }
+                    }
+                    language.* = .{
+                        .name = try allocator.dupe(u8, raw.node.name),
+                        .size = raw.size,
+                    };
+                    errdefer allocator.free(language.name);
+                    if (raw.node.color) |color| {
+                        language.color = try allocator.dupe(u8, color);
+                    }
+                    errdefer if (language.color) |c| allocator.free(c);
+                }
+            }
+        }
+
+        std.log.info(
+            "Getting views for {s}...",
+            .{raw_repo.nameWithOwner},
+        );
+        response, status = try client.rest(
+            try std.mem.concat(
+                arena.allocator(),
+                u8,
+                &.{
+                    "https://api.github.com/repos/",
+                    raw_repo.nameWithOwner,
+                    "/traffic/views",
+                },
+            ),
+        );
+        if (status == .ok) {
+            repository.views = (try std.json.parseFromSliceLeaky(
+                struct { count: u32 },
+                arena.allocator(),
+                response,
+                .{ .ignore_unknown_fields = true },
+            )).count;
+        } else {
+            std.log.info(
+                "Failed to get views for {s} ({?s})",
+                .{ raw_repo.nameWithOwner, status.phrase() },
+            );
+        }
+
+        _ = try repository.get_lines_changed(arena, client, user);
+
+        try seen.put(raw_repo.nameWithOwner, true);
+        try repositories.append(allocator, repository);
+    }
+}
+
 fn get_repos(
     allocator: std.mem.Allocator,
     arena: *std.heap.ArenaAllocator,
@@ -202,195 +440,18 @@ fn get_repos(
         std.log.info("Getting data for user {s}...", .{user});
     }
     for (years) |year| {
-        std.log.info("Getting data from {d}...", .{year});
-        var response, var status = try client.graphql(
-            \\query ($from: DateTime, $to: DateTime) {
-            \\  viewer {
-            \\    contributionsCollection(from: $from, to: $to) {
-            \\      totalRepositoryContributions
-            \\      totalIssueContributions
-            \\      totalCommitContributions
-            \\      totalPullRequestContributions
-            \\      totalPullRequestReviewContributions
-            \\      commitContributionsByRepository(maxRepositories: 100) {
-            \\        repository {
-            \\          nameWithOwner
-            \\          stargazerCount
-            \\          forkCount
-            \\          isPrivate
-            \\          languages(
-            \\              first: 100,
-            \\              orderBy: { direction: DESC, field: SIZE }
-            \\          ) {
-            \\            edges {
-            \\              size
-            \\              node {
-            \\                name
-            \\                color
-            \\              }
-            \\            }
-            \\          }
-            \\        }
-            \\      }
-            \\    }
-            \\  }
-            \\}
-        ,
-            .{
-                .from = try std.fmt.allocPrint(
-                    arena.allocator(),
-                    "{d}-01-01T00:00:00Z",
-                    .{year},
-                ),
-                .to = try std.fmt.allocPrint(
-                    arena.allocator(),
-                    "{d}-01-01T00:00:00Z",
-                    .{year + 1},
-                ),
-            },
+        try get_repos_by_year(
+            allocator,
+            arena,
+            client,
+            user,
+            &result,
+            &seen,
+            &repositories,
+            year,
+            0,
+            12,
         );
-        if (status != .ok) {
-            std.log.err(
-                "Failed to get data from {d} ({?s})",
-                .{ year, status.phrase() },
-            );
-            return error.RequestFailed;
-        }
-        const viewer = (try std.json.parseFromSliceLeaky(
-            struct { data: struct { viewer: struct {
-                contributionsCollection: struct {
-                    totalRepositoryContributions: u32,
-                    totalIssueContributions: u32,
-                    totalCommitContributions: u32,
-                    totalPullRequestContributions: u32,
-                    totalPullRequestReviewContributions: u32,
-                    commitContributionsByRepository: []struct {
-                        repository: struct {
-                            nameWithOwner: []const u8,
-                            stargazerCount: u32,
-                            forkCount: u32,
-                            isPrivate: bool,
-                            languages: ?struct {
-                                edges: ?[]struct {
-                                    size: u32,
-                                    node: struct {
-                                        name: []const u8,
-                                        color: ?[]const u8,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            } } },
-            arena.allocator(),
-            response,
-            .{ .ignore_unknown_fields = true },
-        )).data.viewer;
-
-        const stats = viewer.contributionsCollection;
-        std.log.info(
-            "Parsed {d} total repositories from {d}",
-            .{ stats.commitContributionsByRepository.len, year },
-        );
-
-        result.repo_contributions += stats.totalRepositoryContributions;
-        result.issue_contributions += stats.totalIssueContributions;
-        result.commit_contributions += stats.totalCommitContributions;
-        result.pr_contributions += stats.totalPullRequestContributions;
-        result.review_contributions +=
-            stats.totalPullRequestReviewContributions;
-
-        // TODO: if there are 100 or more repositories, we should subdivide
-        // the date range in half
-
-        for (stats.commitContributionsByRepository) |x| {
-            const raw_repo = x.repository;
-            if (seen.get(raw_repo.nameWithOwner) orelse false) {
-                std.log.debug(
-                    "Skipping {s} (seen)",
-                    .{raw_repo.nameWithOwner},
-                );
-                continue;
-            }
-            var repository = Repository{
-                .name = try allocator.dupe(u8, raw_repo.nameWithOwner),
-                .stars = raw_repo.stargazerCount,
-                .forks = raw_repo.forkCount,
-                .private = raw_repo.isPrivate,
-                .languages = null,
-                .views = 0,
-                .lines_changed = 0,
-            };
-            errdefer repository.deinit(allocator);
-            if (raw_repo.languages) |repo_languages| {
-                if (repo_languages.edges) |raw_languages| {
-                    repository.languages = try allocator.alloc(
-                        Language,
-                        raw_languages.len,
-                    );
-                    errdefer {
-                        allocator.free(repository.languages.?);
-                        repository.languages = null;
-                    }
-                    for (
-                        raw_languages,
-                        repository.languages.?,
-                        0..,
-                    ) |raw, *language, i| {
-                        errdefer {
-                            for (0..i, repository.languages.?) |_, l| {
-                                allocator.free(l.name);
-                                if (l.color) |c| allocator.free(c);
-                            }
-                        }
-                        language.* = .{
-                            .name = try allocator.dupe(u8, raw.node.name),
-                            .size = raw.size,
-                        };
-                        errdefer allocator.free(language.name);
-                        if (raw.node.color) |color| {
-                            language.color = try allocator.dupe(u8, color);
-                        }
-                        errdefer if (language.color) |c| allocator.free(c);
-                    }
-                }
-            }
-
-            std.log.info(
-                "Getting views for {s}...",
-                .{raw_repo.nameWithOwner},
-            );
-            response, status = try client.rest(
-                try std.mem.concat(
-                    arena.allocator(),
-                    u8,
-                    &.{
-                        "https://api.github.com/repos/",
-                        raw_repo.nameWithOwner,
-                        "/traffic/views",
-                    },
-                ),
-            );
-            if (status == .ok) {
-                repository.views = (try std.json.parseFromSliceLeaky(
-                    struct { count: u32 },
-                    arena.allocator(),
-                    response,
-                    .{ .ignore_unknown_fields = true },
-                )).count;
-            } else {
-                std.log.info(
-                    "Failed to get views for {s} ({?s})",
-                    .{ raw_repo.nameWithOwner, status.phrase() },
-                );
-            }
-
-            _ = try repository.get_lines_changed(arena, client, user);
-
-            try seen.put(raw_repo.nameWithOwner, true);
-            try repositories.append(allocator, repository);
-        }
     }
 
     result.repositories = try repositories.toOwnedSlice(allocator);
