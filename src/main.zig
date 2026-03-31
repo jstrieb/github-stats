@@ -44,6 +44,7 @@ const Args = struct {
     languages_output_file: ?[]const u8 = null,
     overview_template: ?[]const u8 = null,
     languages_template: ?[]const u8 = null,
+    max_backoff: usize = 600,
 
     const Self = @This();
 
@@ -212,7 +213,7 @@ pub fn main() !void {
         std.log.info("Collecting statistics from GitHub API", .{});
         var client: HttpClient = try .init(allocator, api_key);
         defer client.deinit();
-        stats = try Statistics.init(&client, allocator);
+        stats = try Statistics.init(&client, allocator, args.max_backoff);
     } else unreachable;
     defer stats.deinit(allocator);
 

@@ -100,13 +100,17 @@ const Language = struct {
     }
 };
 
-pub fn init(client: *HttpClient, allocator: std.mem.Allocator) !Statistics {
+pub fn init(
+    client: *HttpClient,
+    allocator: std.mem.Allocator,
+    max_backoff: usize,
+) !Statistics {
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
 
     var self: Statistics = try getRepos(allocator, &arena, client);
     errdefer self.deinit(allocator);
-    try self.getLinesChanged(&arena, client);
+    try self.getLinesChanged(&arena, client, max_backoff);
     return self;
 }
 
@@ -474,6 +478,7 @@ fn getLinesChanged(
     self: *Statistics,
     arena: *std.heap.ArenaAllocator,
     client: *HttpClient,
+    max_backoff: usize,
 ) !void {
     const T = struct {
         repo: *Repository,
@@ -515,7 +520,7 @@ fn getLinesChanged(
                 // Exponential backoff (in expectation) with jitter
                 item.delay +=
                     std.crypto.random.intRangeAtMost(i64, 2, item.delay);
-                item.delay = @min(item.delay, 600);
+                item.delay = @min(item.delay, max_backoff);
                 try q.add(item);
             },
             else => |status| {

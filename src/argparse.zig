@@ -106,15 +106,15 @@ fn setFromCli(
                         std.process.exit(1);
                     }
                     switch (t) {
-                        // TODO
-                        .int, .float, .@"enum" => comptime unreachable,
+                        .int => @field(result, field.name) =
+                            try std.fmt.parseInt(field.type, args[i], 0),
                         .pointer => @field(
                             result,
                             field.name,
                         ) = try allocator.dupe(u8, args[i]),
                         .bool => comptime unreachable,
                         else => @compileError(
-                            "Disallowed struct field type.",
+                            "Disallowed or unimplemented struct field type.",
                         ),
                     }
                 }
@@ -153,13 +153,15 @@ fn setFromEnv(
                         @field(result, field.name) = value.len > 0 and
                             !std.ascii.eqlIgnoreCase(value, "false");
                     },
-                    // TODO
-                    .int, .float, .@"enum" => comptime unreachable,
+                    .int => @field(result, field.name) =
+                        try std.fmt.parseInt(field.type, entry.value_ptr.*, 0),
                     .pointer => @field(
                         result,
                         field.name,
                     ) = try allocator.dupe(u8, entry.value_ptr.*),
-                    else => @compileError("Disallowed struct field type."),
+                    else => @compileError(
+                        "Disallowed or unimplemented struct field type.",
+                    ),
                 }
                 seen_field.* = true;
             }
