@@ -64,15 +64,27 @@ const Args = struct {
     }
 
     pub fn deinit(self: Self, allocator: std.mem.Allocator) void {
-        if (self.api_key) |s| allocator.free(s);
-        if (self.json_input_file) |s| allocator.free(s);
-        if (self.json_output_file) |s| allocator.free(s);
-        if (self.excluded_repos) |s| allocator.free(s);
-        if (self.excluded_langs) |s| allocator.free(s);
-        if (self.overview_output_file) |s| allocator.free(s);
-        if (self.languages_output_file) |s| allocator.free(s);
-        if (self.overview_template) |s| allocator.free(s);
-        if (self.languages_template) |s| allocator.free(s);
+        inline for (@typeInfo(Self).@"struct".fields) |field| {
+            switch (@typeInfo(field.type)) {
+                .optional => |optional| {
+                    switch (@typeInfo(optional.child)) {
+                        .pointer => |pointer| switch (pointer.size) {
+                            .slice => if (@field(self, field.name)) |p|
+                                allocator.free(p),
+                            else => comptime unreachable,
+                        },
+                        .bool, .int => {},
+                        else => comptime unreachable,
+                    }
+                },
+                .pointer => |p| switch (p.size) {
+                    .slice => allocator.free(@field(self, field.name)),
+                    else => comptime unreachable,
+                },
+                .bool, .int => {},
+                else => comptime unreachable,
+            }
+        }
     }
 };
 
