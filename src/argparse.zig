@@ -25,7 +25,7 @@ pub fn parse(
     errdefer {
         inline for (fields, seen) |field, seen_field| {
             if (seen_field) {
-                free_field(allocator, @field(result, field.name));
+                freeField(allocator, @field(result, field.name));
             }
         }
     }
@@ -38,7 +38,7 @@ pub fn parse(
 
     inline for (fields, seen) |field, seen_field| {
         if (!seen_field) {
-            if (@typeInfo(strip_optional(field.type)) == .bool) {
+            if (@typeInfo(stripOptional(field.type)) == .bool) {
                 @field(result, field.name) = false;
             } else {
                 try stderr.print(
@@ -92,7 +92,7 @@ fn setFromCli(
         std.mem.replaceScalar(u8, arg, '-', '_');
         inline for (@typeInfo(T).@"struct".fields, seen) |field, *seen_field| {
             if (!seen_field.* and std.ascii.eqlIgnoreCase(arg, field.name)) {
-                const t = @typeInfo(strip_optional(field.type));
+                const t = @typeInfo(stripOptional(field.type));
                 if (t == .bool) {
                     @field(result, field.name) = true;
                 } else {
@@ -146,7 +146,7 @@ fn setFromEnv(
         std.mem.replaceScalar(u8, key, '-', '_');
         inline for (@typeInfo(T).@"struct".fields, seen) |field, *seen_field| {
             if (!seen_field.* and std.ascii.eqlIgnoreCase(key, field.name)) {
-                switch (@typeInfo(strip_optional(field.type))) {
+                switch (@typeInfo(stripOptional(field.type))) {
                     .bool => {
                         const value = try a.dupe(u8, entry.value_ptr.*);
                         defer a.free(value);
@@ -176,7 +176,7 @@ fn setFromDefaults(
     inline for (@typeInfo(T).@"struct".fields, seen) |field, *seen_field| {
         if (!seen_field.*) {
             if (field.defaultValue()) |default| {
-                switch (@typeInfo(strip_optional(field.type))) {
+                switch (@typeInfo(stripOptional(field.type))) {
                     .bool, .int, .float, .@"enum" => {
                         @field(result, field.name) = default;
                     },
@@ -197,7 +197,7 @@ fn printUsage(T: type, allocator: std.mem.Allocator, argv0: []const u8) !void {
     try stdout.print("Options:\n", .{});
     const fields = @typeInfo(T).@"struct".fields;
     inline for (fields) |field| {
-        switch (@typeInfo(strip_optional(field.type))) {
+        switch (@typeInfo(stripOptional(field.type))) {
             .bool => {
                 const flag_version = try allocator.dupe(u8, field.name);
                 defer allocator.free(flag_version);
@@ -214,16 +214,16 @@ fn printUsage(T: type, allocator: std.mem.Allocator, argv0: []const u8) !void {
     }
 }
 
-fn strip_optional(T: type) type {
+fn stripOptional(T: type) type {
     const info = @typeInfo(T);
     if (info != .optional) return T;
-    return strip_optional(info.optional.child);
+    return stripOptional(info.optional.child);
 }
 
-fn free_field(allocator: std.mem.Allocator, field: anytype) void {
+fn freeField(allocator: std.mem.Allocator, field: anytype) void {
     switch (@typeInfo(@TypeOf(field))) {
         .pointer => allocator.free(field),
-        .optional => if (field) |v| free_field(allocator, v),
+        .optional => if (field) |v| freeField(allocator, v),
         .bool, .int, .float, .@"enum" => {},
         else => @compileError("Disallowed struct field type."),
     }

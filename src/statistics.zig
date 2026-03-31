@@ -31,7 +31,7 @@ const Repository = struct {
         }
     }
 
-    pub fn get_lines_changed(
+    pub fn getLinesChanged(
         self: *@This(),
         arena: *std.heap.ArenaAllocator,
         client: *HttpClient,
@@ -104,9 +104,9 @@ pub fn init(client: *HttpClient, allocator: std.mem.Allocator) !Statistics {
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
 
-    var self: Statistics = try get_repos(allocator, &arena, client);
+    var self: Statistics = try getRepos(allocator, &arena, client);
     errdefer self.deinit(allocator);
-    try self.get_lines_changed(&arena, client);
+    try self.getLinesChanged(&arena, client);
     return self;
 }
 
@@ -132,7 +132,7 @@ pub fn deinit(self: Statistics, allocator: std.mem.Allocator) void {
     allocator.free(self.name);
 }
 
-fn get_basic_info(
+fn getBasicInfo(
     client: *HttpClient,
     allocator: std.mem.Allocator,
 ) !struct { []u32, []const u8, ?[]const u8 } {
@@ -174,7 +174,7 @@ fn get_basic_info(
     };
 }
 
-fn get_repos_by_year(
+fn getReposByYear(
     context: struct {
         allocator: std.mem.Allocator,
         arena: *std.heap.ArenaAllocator,
@@ -289,7 +289,7 @@ fn get_repos_by_year(
         for (&[_]usize{ 2, 3 }) |factor| {
             if (months % factor == 0) {
                 for (0..factor) |i| {
-                    try get_repos_by_year(
+                    try getReposByYear(
                         context,
                         year,
                         start_month + (months / factor) * i,
@@ -396,7 +396,7 @@ fn get_repos_by_year(
             );
         }
 
-        _ = try repository.get_lines_changed(
+        _ = try repository.getLinesChanged(
             context.arena,
             context.client,
             context.user,
@@ -407,7 +407,7 @@ fn get_repos_by_year(
     }
 }
 
-fn get_repos(
+fn getRepos(
     allocator: std.mem.Allocator,
     arena: *std.heap.ArenaAllocator,
     client: *HttpClient,
@@ -429,14 +429,14 @@ fn get_repos(
     defer seen.deinit();
 
     const years, const user, const name =
-        try get_basic_info(client, arena.allocator());
+        try getBasicInfo(client, arena.allocator());
     if (name) |n| {
         std.log.info("Getting data for {s} ({s})...", .{ n, user });
     } else {
         std.log.info("Getting data for user {s}...", .{user});
     }
     for (years) |year| {
-        try get_repos_by_year(.{
+        try getReposByYear(.{
             .allocator = allocator,
             .arena = arena,
             .client = client,
@@ -470,7 +470,7 @@ fn get_repos(
     return result;
 }
 
-fn get_lines_changed(
+fn getLinesChanged(
     self: *Statistics,
     arena: *std.heap.ArenaAllocator,
     client: *HttpClient,
@@ -508,7 +508,7 @@ fn get_lines_changed(
             });
             std.Thread.sleep(delay * std.time.ns_per_s);
         }
-        switch (try item.repo.get_lines_changed(arena, client, self.user)) {
+        switch (try item.repo.getLinesChanged(arena, client, self.user)) {
             .ok => {},
             .accepted => {
                 item.timestamp = std.time.timestamp() + item.delay;
