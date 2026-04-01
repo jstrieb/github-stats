@@ -145,7 +145,7 @@ pub fn rest(
             .authorization = .{ .override = self.bearer },
             .content_type = .{ .override = "application/json" },
         },
-        &.{.{ .name = "X-GitHub-Api-Version", .value = "2022-11-28" }},
+        &.{.{ .name = "X-GitHub-Api-Version", .value = "2026-03-10" }},
         8,
     );
 }
