@@ -291,6 +291,11 @@ fn getReposByYear(
     );
 
     const limit = 100;
+    // This slightly convoluted logic subdivides the months range for the
+    // current call. It assumes the initial months range is 12, and subdivides
+    // by increasingly large prime factors of 12. If it cannot divide by any
+    // prime factors of 12, the size of the range is 1. In that case, it emits a
+    // warning and proceeds with processing the data.
     if (stats.commitContributionsByRepository.len >= limit) {
         for (&[_]usize{ 2, 3 }) |factor| {
             if (months % factor == 0) {
