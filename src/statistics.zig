@@ -104,13 +104,14 @@ pub fn init(
     client: *HttpClient,
     allocator: std.mem.Allocator,
     max_backoff: usize,
+    max_retries: ?usize,
 ) !Statistics {
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
 
     var self: Statistics = try getRepos(allocator, &arena, client);
     errdefer self.deinit(allocator);
-    try self.getLinesChanged(&arena, client, max_backoff);
+    try self.getLinesChanged(&arena, client, max_backoff, max_retries);
     return self;
 }
 
@@ -479,11 +480,13 @@ fn getLinesChanged(
     arena: *std.heap.ArenaAllocator,
     client: *HttpClient,
     max_backoff: usize,
+    max_retries: ?usize,
 ) !void {
     const T = struct {
         repo: *Repository,
         delay: i64,
         timestamp: i64,
+        retries: usize,
     };
     var q: std.PriorityQueue(T, void, struct {
         pub fn compareFn(_: void, lhs: T, rhs: T) std.math.Order {
@@ -499,6 +502,7 @@ fn getLinesChanged(
             .repo = repo,
             .delay = 8,
             .timestamp = std.time.timestamp(),
+            .retries = 0,
         });
     }
     while (q.count() > 0) {
@@ -521,7 +525,14 @@ fn getLinesChanged(
                 item.delay +=
                     std.crypto.random.intRangeAtMost(i64, 2, item.delay);
                 item.delay = @min(item.delay, max_backoff);
-                try q.add(item);
+                item.retries += 1;
+                if (max_retries) |max| {
+                    if (item.retries <= max) {
+                        try q.add(item);
+                    }
+                } else {
+                    try q.add(item);
+                }
             },
             else => |status| {
                 std.log.err(

@@ -107,7 +107,11 @@ fn setFromCli(
                     }
                     switch (t) {
                         .int => @field(result, field.name) =
-                            try std.fmt.parseInt(field.type, args[i], 0),
+                            try std.fmt.parseInt(
+                                stripOptional(field.type),
+                                args[i],
+                                0,
+                            ),
                         .pointer => @field(
                             result,
                             field.name,
@@ -153,8 +157,11 @@ fn setFromEnv(
                         @field(result, field.name) = value.len > 0 and
                             !std.ascii.eqlIgnoreCase(value, "false");
                     },
-                    .int => @field(result, field.name) =
-                        try std.fmt.parseInt(field.type, entry.value_ptr.*, 0),
+                    .int => @field(result, field.name) = try std.fmt.parseInt(
+                        stripOptional(field.type),
+                        entry.value_ptr.*,
+                        0,
+                    ),
                     .pointer => @field(
                         result,
                         field.name,

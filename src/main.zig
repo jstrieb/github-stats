@@ -45,6 +45,7 @@ const Args = struct {
     overview_template: ?[]const u8 = null,
     languages_template: ?[]const u8 = null,
     max_backoff: usize = 600,
+    max_retries: ?usize = null,
 
     const Self = @This();
 
@@ -216,16 +217,20 @@ pub fn main() !void {
     } else null;
     defer if (excluded_langs) |excluded| allocator.free(excluded);
 
-    var stats: Statistics = undefined;
-    if (args.json_input_file) |path| {
+    var stats: Statistics = if (args.json_input_file) |path| stats: {
         const data = try readFile(allocator, path);
         defer allocator.free(data);
-        stats = try Statistics.initFromJson(allocator, data);
-    } else if (args.api_key) |api_key| {
+        break :stats try Statistics.initFromJson(allocator, data);
+    } else if (args.api_key) |api_key| stats: {
         std.log.info("Collecting statistics from GitHub API", .{});
         var client: HttpClient = try .init(allocator, api_key);
         defer client.deinit();
-        stats = try Statistics.init(&client, allocator, args.max_backoff);
+        break :stats try Statistics.init(
+            &client,
+            allocator,
+            args.max_backoff,
+            args.max_retries,
+        );
     } else unreachable;
     defer stats.deinit(allocator);
 
