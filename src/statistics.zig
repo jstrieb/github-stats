@@ -136,10 +136,11 @@ pub fn deinit(self: Statistics, allocator: std.mem.Allocator) void {
     allocator.free(self.name);
 }
 
-fn getBasicInfo(
-    client: *HttpClient,
-    allocator: std.mem.Allocator,
-) !struct { []u32, []const u8, ?[]const u8 } {
+fn getBasicInfo(client: *HttpClient, allocator: std.mem.Allocator) !struct {
+    years: []u32,
+    user: []const u8,
+    name: ?[]const u8,
+} {
     std.log.info("Getting contribution years...", .{});
     const response, const status = try client.graphql(
         \\query {
@@ -172,9 +173,9 @@ fn getBasicInfo(
         .{ .ignore_unknown_fields = true },
     )).data.viewer;
     return .{
-        parsed.contributionsCollection.contributionYears,
-        parsed.login,
-        parsed.name,
+        .years = parsed.contributionsCollection.contributionYears,
+        .user = parsed.login,
+        .name = parsed.name,
     };
 }
 
@@ -432,19 +433,18 @@ fn getRepos(
     var seen: std.StringHashMap(bool) = .init(arena.allocator());
     defer seen.deinit();
 
-    const years, const user, const name =
-        try getBasicInfo(client, arena.allocator());
-    if (name) |n| {
-        std.log.info("Getting data for {s} ({s})...", .{ n, user });
+    const info = try getBasicInfo(client, arena.allocator());
+    if (info.name) |n| {
+        std.log.info("Getting data for {s} ({s})...", .{ n, info.user });
     } else {
-        std.log.info("Getting data for user {s}...", .{user});
+        std.log.info("Getting data for user {s}...", .{info.user});
     }
-    for (years) |year| {
+    for (info.years) |year| {
         try getReposByYear(.{
             .allocator = allocator,
             .arena = arena,
             .client = client,
-            .user = user,
+            .user = info.user,
             .result = &result,
             .seen = &seen,
             .repositories = &repositories,
@@ -467,9 +467,9 @@ fn getRepos(
         }
     }.lessThanFn);
 
-    result.user = try allocator.dupe(u8, user);
+    result.user = try allocator.dupe(u8, info.user);
     errdefer allocator.free(result.user);
-    result.name = try allocator.dupe(u8, name orelse user);
+    result.name = try allocator.dupe(u8, info.name orelse info.user);
     errdefer allocator.free(result.name);
     return result;
 }
