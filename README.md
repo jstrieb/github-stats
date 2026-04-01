@@ -52,12 +52,22 @@ The GitHub statistics API returns inaccurate results in some situations:
   - If you lack permissions to access the view count for a repository, it will
     be tallied as zero views – this is common for external repositories where
     your only contribution is making a pull request
-- Total lines of code modified may be inflated – it counts changes to files like
-  `package.json` that may impact the line count in surprising ways
+- Total lines of code modified may be inflated – GitHub counts changes to files like
+  `package-lock.json` that may impact the line count in surprising ways
+  - On the other hand, GitHub refuses to count lines of code for repositories
+    with more than 10,000 commits, so contributions to those will not be
+    reflected in the data at all
+  - GitHub no longer supports computing contributor stats for private repos on
+    free accounts, so we compute them ourselves by cloning the repo locally and
+    tallying the stats with the git CLI – our computed totals may differ from
+    GitHub's
 - Only repositories with commit contributions are counted, so if you only open
   an issue on a repo, it will not show up in the statistics
   - Repos you created and own may not be counted if you never commit to them, or
     if the committer email is not connected to your GitHub account
+
+If the calculated numbers seem strange, run the CLI locally and dump JSON output
+to determine which repositories are affecting the statistics in unexpected ways.
 
 
 # Installation
