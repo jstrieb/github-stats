@@ -41,7 +41,7 @@ const Repository = struct {
             "Trying to get lines of code changed for {s}...",
             .{self.name},
         );
-        const response, const status = try client.rest(
+        const response = try client.rest(
             try std.mem.concat(
                 arena.allocator(),
                 u8,
@@ -52,7 +52,7 @@ const Repository = struct {
                 },
             ),
         );
-        if (status == .ok) {
+        if (response.status == .ok) {
             const authors = (try std.json.parseFromSliceLeaky(
                 []struct {
                     author: struct { login: []const u8 },
@@ -62,7 +62,7 @@ const Repository = struct {
                     },
                 },
                 arena.allocator(),
-                response,
+                response.body,
                 .{ .ignore_unknown_fields = true },
             ));
             self.lines_changed = 0;
@@ -85,7 +85,7 @@ const Repository = struct {
                 },
             );
         }
-        return status;
+        return response.status;
     }
 };
 
@@ -143,7 +143,7 @@ fn getBasicInfo(client: *HttpClient, allocator: std.mem.Allocator) !struct {
     name: ?[]const u8,
 } {
     std.log.info("Getting contribution years...", .{});
-    const response, const status = try client.graphql(
+    const response = try client.graphql(
         \\query {
         \\  viewer {
         \\    login
@@ -154,10 +154,10 @@ fn getBasicInfo(client: *HttpClient, allocator: std.mem.Allocator) !struct {
         \\  }
         \\}
     , null);
-    if (status != .ok) {
+    if (response.status != .ok) {
         std.log.err(
             "Failed to get contribution years ({?s})",
-            .{status.phrase()},
+            .{response.status.phrase()},
         );
         return error.RequestFailed;
     }
@@ -170,7 +170,7 @@ fn getBasicInfo(client: *HttpClient, allocator: std.mem.Allocator) !struct {
             },
         } } },
         allocator,
-        response,
+        response.body,
         .{ .ignore_unknown_fields = true },
     )).data.viewer;
     return .{
@@ -198,7 +198,7 @@ fn getReposByYear(
         "Getting {d} month{s} of data starting from {d}/{d}...",
         .{ months, if (months != 1) "s" else "", start_month + 1, year },
     );
-    var response, var status = try context.client.graphql(
+    var response = try context.client.graphql(
         \\query ($from: DateTime, $to: DateTime) {
         \\  viewer {
         \\    contributionsCollection(from: $from, to: $to) {
@@ -247,10 +247,10 @@ fn getReposByYear(
             ),
         },
     );
-    if (status != .ok) {
+    if (response.status != .ok) {
         std.log.err(
             "Failed to get data from {d} ({?s})",
-            .{ year, status.phrase() },
+            .{ year, response.status.phrase() },
         );
         return error.RequestFailed;
     }
@@ -282,7 +282,7 @@ fn getReposByYear(
             },
         } } },
         context.arena.allocator(),
-        response,
+        response.body,
         .{ .ignore_unknown_fields = true },
     )).data.viewer.contributionsCollection;
     std.log.info(
@@ -382,7 +382,7 @@ fn getReposByYear(
             "Getting views for {s}...",
             .{raw_repo.nameWithOwner},
         );
-        response, status = try context.client.rest(
+        response = try context.client.rest(
             try std.mem.concat(
                 context.arena.allocator(),
                 u8,
@@ -393,17 +393,17 @@ fn getReposByYear(
                 },
             ),
         );
-        if (status == .ok) {
+        if (response.status == .ok) {
             repository.views = (try std.json.parseFromSliceLeaky(
                 struct { count: u32 },
                 context.arena.allocator(),
-                response,
+                response.body,
                 .{ .ignore_unknown_fields = true },
             )).count;
         } else {
             std.log.info(
                 "Failed to get views for {s} ({?s})",
-                .{ raw_repo.nameWithOwner, status.phrase() },
+                .{ raw_repo.nameWithOwner, response.status.phrase() },
             );
         }
 

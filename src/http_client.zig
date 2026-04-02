@@ -10,7 +10,10 @@ client: std.http.Client,
 bearer: []const u8,
 
 const Self = @This();
-const Response = struct { []const u8, std.http.Status };
+const Response = struct {
+    body: []const u8,
+    status: std.http.Status,
+};
 const Request = struct {
     url: []const u8,
     body: ?[]const u8 = null,
@@ -68,7 +71,10 @@ pub fn fetch(self: *Self, request: Request, retries: isize) !Response {
         },
         else => err,
     })).status;
-    return .{ try writer.toOwnedSlice(), status };
+    return .{
+        .body = try writer.toOwnedSlice(),
+        .status = status,
+    };
 }
 
 pub fn graphql(
