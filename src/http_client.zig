@@ -1,6 +1,6 @@
-//! Naive, unoptimized HTTP client with .get and .post methods. Simple, and not
-//! particularly efficient. Response bodies stay allocated for the lifetime of
-//! the client.
+//! Naive, unoptimized HTTP client with a .request method that wraps Zig's HTTP
+//! client fetch. Simple, and not particularly efficient. Response bodies stay
+//! allocated for the lifetime of the client.
 
 const std = @import("std");
 
@@ -11,6 +11,12 @@ bearer: []const u8,
 
 const Self = @This();
 const Response = struct { []const u8, std.http.Status };
+const Request = struct {
+    url: []const u8,
+    body: ?[]const u8 = null,
+    headers: std.http.Client.Request.Headers = .{},
+    extra_headers: []const std.http.Header = &.{},
+};
 
 pub fn init(allocator: std.mem.Allocator, token: []const u8) !Self {
     const arena = try allocator.create(std.heap.ArenaAllocator);
@@ -30,13 +36,7 @@ pub fn deinit(self: *Self) void {
     self.gpa.destroy(self.arena);
 }
 
-pub fn get(
-    self: *Self,
-    url: []const u8,
-    headers: std.http.Client.Request.Headers,
-    extra_headers: []const std.http.Header,
-    retries: isize,
-) !Response {
+pub fn fetch(self: *Self, request: Request, retries: isize) !Response {
     if (retries <= -1) {
         return error.TooManyRetries;
     }
@@ -47,10 +47,10 @@ pub fn get(
     );
     errdefer writer.deinit();
     const status = (try (self.client.fetch(.{
-        .location = .{ .url = url },
+        .location = .{ .url = request.url },
         .response_writer = &writer.writer,
-        .headers = headers,
-        .extra_headers = extra_headers,
+        .payload = request.body,
+        .headers = request.headers,
     }) catch |err| switch (err) {
         error.HttpConnectionClosing => {
             // Handle a Zig HTTP bug where keep-alive connections are closed by
@@ -64,48 +64,7 @@ pub fn get(
             );
             self.client.deinit();
             self.client = .{ .allocator = self.arena.allocator() };
-            return self.get(url, headers, extra_headers, retries - 1);
-        },
-        else => err,
-    })).status;
-    return .{ try writer.toOwnedSlice(), status };
-}
-
-pub fn post(
-    self: *Self,
-    url: []const u8,
-    body: []const u8,
-    headers: std.http.Client.Request.Headers,
-    retries: isize,
-) !Response {
-    if (retries <= -1) {
-        return error.TooManyRetries;
-    }
-
-    var writer = try std.Io.Writer.Allocating.initCapacity(
-        self.arena.allocator(),
-        1024,
-    );
-    errdefer writer.deinit();
-    const status = (try (self.client.fetch(.{
-        .location = .{ .url = url },
-        .response_writer = &writer.writer,
-        .payload = body,
-        .headers = headers,
-    }) catch |err| switch (err) {
-        error.HttpConnectionClosing => {
-            // Handle a Zig HTTP bug where keep-alive connections are closed by
-            // the server after a timeout, but the client doesn't handle it
-            // properly. For now we nuke the whole client (and associated
-            // connection pool) and make a new one, but there might be a better
-            // way to handle this.
-            std.log.debug(
-                "Keep alive connection closed. Initializing a new client.",
-                .{},
-            );
-            self.client.deinit();
-            self.client = .{ .allocator = self.arena.allocator() };
-            return self.post(url, body, headers, retries - 1);
+            return self.fetch(request, retries - 1);
         },
         else => err,
     })).status;
@@ -121,31 +80,31 @@ pub fn graphql(
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    return try self.post(
-        "https://api.github.com/graphql",
-        try std.json.Stringify.valueAlloc(allocator, .{
+    return try self.fetch(.{
+        .url = "https://api.github.com/graphql",
+        .body = try std.json.Stringify.valueAlloc(allocator, .{
             .query = body,
             .variables = variables,
         }, .{}),
-        .{
+        .headers = .{
             .authorization = .{ .override = self.bearer },
             .content_type = .{ .override = "application/json" },
         },
-        8,
-    );
+    }, 8);
 }
 
 pub fn rest(
     self: *Self,
     url: []const u8,
 ) !Response {
-    return try self.get(
-        url,
-        .{
+    return try self.fetch(.{
+        .url = url,
+        .headers = .{
             .authorization = .{ .override = self.bearer },
             .content_type = .{ .override = "application/json" },
         },
-        &.{.{ .name = "X-GitHub-Api-Version", .value = "2026-03-10" }},
-        8,
-    );
+        .extra_headers = &.{
+            .{ .name = "X-GitHub-Api-Version", .value = "2026-03-10" },
+        },
+    }, 8);
 }
