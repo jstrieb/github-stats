@@ -3,6 +3,7 @@ const std = @import("std");
 
 const argparse = @import("argparse.zig");
 const glob = @import("glob.zig");
+const templateFill = @import("template.zig").fill;
 
 const HttpClient = @import("http_client.zig");
 const Statistics = @import("statistics.zig");
@@ -95,33 +96,7 @@ fn overview(
     template: []const u8,
 ) ![]const u8 {
     const a = arena.allocator();
-    var out_data = template;
-    // Vulnerable to template injection. In practice, this should never happen.
-    inline for (@typeInfo(@TypeOf(stats)).@"struct".fields) |field| {
-        switch (@typeInfo(field.type)) {
-            .int => {
-                out_data = try std.mem.replaceOwned(
-                    u8,
-                    a,
-                    out_data,
-                    "{{ " ++ field.name ++ " }}",
-                    try decimalToString(a, @field(stats, field.name)),
-                );
-            },
-            .pointer => {
-                out_data = try std.mem.replaceOwned(
-                    u8,
-                    a,
-                    out_data,
-                    "{{ " ++ field.name ++ " }}",
-                    @field(stats, field.name),
-                );
-            },
-            .@"struct" => {},
-            else => comptime unreachable,
-        }
-    }
-    return out_data;
+    return templateFill(a, template, stats);
 }
 
 fn languages(
@@ -172,14 +147,14 @@ fn languages(
             \\
         , .{ (i + 1) * 150, color orelse "#000", language, percent });
     }
-    // Vulnerable to template injection. In practice, this should never happen.
-    return try std.mem.replaceOwned(u8, a, try std.mem.replaceOwned(
-        u8,
+    return templateFill(
         a,
         template,
-        "{{ lang_list }}",
-        try std.mem.concat(a, u8, lang_list),
-    ), "{{ progress }}", try std.mem.concat(a, u8, progress));
+        struct { lang_list: []const u8, progress: []const u8 }{
+            .lang_list = try std.mem.concat(a, u8, lang_list),
+            .progress = try std.mem.concat(a, u8, progress),
+        },
+    );
 }
 
 pub fn main() !void {
@@ -364,34 +339,4 @@ fn writeFile(
     var writer = out.writer(&write_buffer);
     try writer.interface.writeAll(data);
     try writer.interface.flush();
-}
-
-fn decimalToString(allocator: std.mem.Allocator, n: anytype) ![]const u8 {
-    const info = @typeInfo(@TypeOf(n));
-    if (info != .int or info.int.signedness != .unsigned) {
-        @compileError("Only implemented for unsigned integers.");
-    }
-
-    const s = try std.fmt.allocPrint(allocator, "{d}", .{n});
-    defer allocator.free(s);
-    const digits = s.len;
-    const commas = (digits - 1) / 3;
-    const result = try allocator.alloc(u8, digits + commas);
-    errdefer comptime unreachable;
-
-    var i: usize = result.len - 1;
-    var j: usize = s.len - 1;
-    while (true) {
-        if ((result.len - i) % 4 == 0) {
-            result[i] = ',';
-            i -= 1;
-        }
-        result[i] = s[j];
-        if (i == 0 and j == 0) {
-            break;
-        } else if (i > 0 and j > 0) {} else unreachable;
-        i -= 1;
-        j -= 1;
-    }
-    return result;
 }
