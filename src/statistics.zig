@@ -103,7 +103,7 @@ const Language = struct {
 pub fn init(
     client: *HttpClient,
     allocator: std.mem.Allocator,
-    max_backoff: usize,
+    max_backoff: ?usize,
     max_retries: ?usize,
 ) !Statistics {
     var arena = std.heap.ArenaAllocator.init(allocator);
@@ -484,7 +484,7 @@ fn getLinesChanged(
     self: *Statistics,
     arena: *std.heap.ArenaAllocator,
     client: *HttpClient,
-    max_backoff: usize,
+    max_backoff: ?usize,
     max_retries: ?usize,
 ) !void {
     const T = struct {
@@ -529,7 +529,9 @@ fn getLinesChanged(
                 // Exponential backoff (in expectation) with jitter
                 item.delay +=
                     std.crypto.random.intRangeAtMost(i64, 2, item.delay);
-                item.delay = @min(item.delay, max_backoff);
+                if (max_backoff) |backoff| {
+                    item.delay = @min(item.delay, backoff);
+                }
                 item.retries += 1;
                 if (max_retries) |max| {
                     if (item.retries <= max) {

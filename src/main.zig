@@ -44,7 +44,7 @@ const Args = struct {
     languages_output_file: ?[]const u8 = null,
     overview_template: ?[]const u8 = null,
     languages_template: ?[]const u8 = null,
-    max_backoff: usize = 600,
+    max_backoff: ?usize = null,
     max_retries: ?usize = null,
 
     const Self = @This();
