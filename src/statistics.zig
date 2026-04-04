@@ -527,8 +527,11 @@ fn getLinesChanged(
             .accepted => {
                 item.timestamp = std.time.timestamp() + item.delay;
                 // Exponential backoff (in expectation) with jitter
-                item.delay +=
-                    std.crypto.random.intRangeAtMost(i64, 2, item.delay);
+                item.delay += std.crypto.random.intRangeAtMost(
+                    i64,
+                    2,
+                    @max(item.delay, 2),
+                );
                 if (max_backoff) |backoff| {
                     item.delay = @min(item.delay, backoff);
                 }
