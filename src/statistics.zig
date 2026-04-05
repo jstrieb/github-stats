@@ -52,6 +52,7 @@ const Repository = struct {
                 },
             ),
         );
+        defer client.allocator.free(response.body);
         if (response.status == .ok) {
             const authors = (try std.json.parseFromSliceLeaky(
                 []struct {
@@ -137,7 +138,7 @@ pub fn deinit(self: Statistics, allocator: std.mem.Allocator) void {
     allocator.free(self.name);
 }
 
-fn getBasicInfo(client: *HttpClient, allocator: std.mem.Allocator) !struct {
+fn getBasicInfo(client: *HttpClient, arena: *std.heap.ArenaAllocator) !struct {
     years: []u32,
     user: []const u8,
     name: ?[]const u8,
@@ -154,6 +155,7 @@ fn getBasicInfo(client: *HttpClient, allocator: std.mem.Allocator) !struct {
         \\  }
         \\}
     , null);
+    defer client.allocator.free(response.body);
     if (response.status != .ok) {
         std.log.err(
             "Failed to get contribution years ({?s})",
@@ -169,9 +171,9 @@ fn getBasicInfo(client: *HttpClient, allocator: std.mem.Allocator) !struct {
                 contributionYears: []u32,
             },
         } } },
-        allocator,
+        arena.allocator(),
         response.body,
-        .{ .ignore_unknown_fields = true },
+        .{ .ignore_unknown_fields = true, .allocate = .alloc_always },
     )).data.viewer;
     return .{
         .years = parsed.contributionsCollection.contributionYears,
@@ -247,6 +249,7 @@ fn getReposByYear(
             ),
         },
     );
+    errdefer context.client.allocator.free(response.body);
     if (response.status != .ok) {
         std.log.err(
             "Failed to get data from {d} ({?s})",
@@ -283,8 +286,9 @@ fn getReposByYear(
         } } },
         context.arena.allocator(),
         response.body,
-        .{ .ignore_unknown_fields = true },
+        .{ .ignore_unknown_fields = true, .allocate = .alloc_always },
     )).data.viewer.contributionsCollection;
+    context.client.allocator.free(response.body);
     std.log.info(
         "Parsed {d} total repositories from {d}",
         .{ stats.commitContributionsByRepository.len, year },
@@ -393,6 +397,7 @@ fn getReposByYear(
                 },
             ),
         );
+        defer context.client.allocator.free(response.body);
         if (response.status == .ok) {
             repository.views = (try std.json.parseFromSliceLeaky(
                 struct { count: u32 },
@@ -439,7 +444,7 @@ fn getRepos(
     var seen: std.StringHashMap(bool) = .init(arena.allocator());
     defer seen.deinit();
 
-    const info = try getBasicInfo(client, arena.allocator());
+    const info = try getBasicInfo(client, arena);
     if (info.name) |n| {
         std.log.info("Getting data for {s} ({s})...", .{ n, info.user });
     } else {

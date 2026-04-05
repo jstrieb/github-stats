@@ -4,8 +4,7 @@
 
 const std = @import("std");
 
-gpa: std.mem.Allocator,
-arena: *std.heap.ArenaAllocator,
+allocator: std.mem.Allocator,
 client: std.http.Client,
 bearer: []const u8,
 
@@ -22,21 +21,16 @@ const Request = struct {
 };
 
 pub fn init(allocator: std.mem.Allocator, token: []const u8) !Self {
-    const arena = try allocator.create(std.heap.ArenaAllocator);
-    arena.* = std.heap.ArenaAllocator.init(allocator);
-    const a = arena.allocator();
     return .{
-        .gpa = allocator,
-        .arena = arena,
-        .client = .{ .allocator = a },
-        .bearer = try std.fmt.allocPrint(a, "Bearer {s}", .{token}),
+        .allocator = allocator,
+        .client = .{ .allocator = allocator },
+        .bearer = try std.fmt.allocPrint(allocator, "Bearer {s}", .{token}),
     };
 }
 
 pub fn deinit(self: *Self) void {
     self.client.deinit();
-    self.arena.deinit();
-    self.gpa.destroy(self.arena);
+    self.allocator.free(self.bearer);
 }
 
 pub fn fetch(self: *Self, request: Request, retries: isize) !Response {
@@ -44,10 +38,8 @@ pub fn fetch(self: *Self, request: Request, retries: isize) !Response {
         return error.TooManyRetries;
     }
 
-    var writer = try std.Io.Writer.Allocating.initCapacity(
-        self.arena.allocator(),
-        1024,
-    );
+    var writer =
+        try std.Io.Writer.Allocating.initCapacity(self.allocator, 1024);
     errdefer writer.deinit();
     const status = (try (self.client.fetch(.{
         .location = .{ .url = request.url },
@@ -66,7 +58,8 @@ pub fn fetch(self: *Self, request: Request, retries: isize) !Response {
                 .{},
             );
             self.client.deinit();
-            self.client = .{ .allocator = self.arena.allocator() };
+            self.client = .{ .allocator = self.allocator };
+            writer.deinit();
             return self.fetch(request, retries - 1);
         },
         else => err,
@@ -82,16 +75,14 @@ pub fn graphql(
     body: []const u8,
     variables: anytype,
 ) !Response {
-    var arena = std.heap.ArenaAllocator.init(self.arena.allocator());
-    defer arena.deinit();
-    const allocator = arena.allocator();
-
+    const serialized = try std.json.Stringify.valueAlloc(self.allocator, .{
+        .query = body,
+        .variables = variables,
+    }, .{});
+    defer self.allocator.free(serialized);
     return try self.fetch(.{
         .url = "https://api.github.com/graphql",
-        .body = try std.json.Stringify.valueAlloc(allocator, .{
-            .query = body,
-            .variables = variables,
-        }, .{}),
+        .body = serialized,
         .headers = .{
             .authorization = .{ .override = self.bearer },
             .content_type = .{ .override = "application/json" },
