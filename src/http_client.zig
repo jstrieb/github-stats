@@ -46,6 +46,7 @@ pub fn fetch(self: *Self, request: Request, retries: isize) !Response {
         .response_writer = &writer.writer,
         .payload = request.body,
         .headers = request.headers,
+        .extra_headers = request.extra_headers,
     }) catch |err| switch (err) {
         error.HttpConnectionClosing => {
             // Handle a Zig HTTP bug where keep-alive connections are closed by
