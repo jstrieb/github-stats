@@ -40,7 +40,8 @@ pub fn fetch(self: *Self, request: Request, retries: isize) !Response {
 
     var writer =
         try std.Io.Writer.Allocating.initCapacity(self.allocator, 1024);
-    errdefer writer.deinit();
+    var writer_initialized = true;
+    errdefer if (writer_initialized) writer.deinit();
     const status = (try (self.client.fetch(.{
         .location = .{ .url = request.url },
         .response_writer = &writer.writer,
@@ -61,6 +62,7 @@ pub fn fetch(self: *Self, request: Request, retries: isize) !Response {
             self.client.deinit();
             self.client = .{ .allocator = self.allocator };
             writer.deinit();
+            writer_initialized = false;
             return self.fetch(request, retries - 1);
         },
         else => err,
