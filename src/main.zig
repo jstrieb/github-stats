@@ -32,7 +32,7 @@ fn logFn(
 }
 
 const Args = struct {
-    api_key: ?[]const u8 = null,
+    github_token: ?[]const u8 = null,
     json_input_file: ?[]const u8 = null,
     json_output_file: ?[]const u8 = null,
     silent: bool = false,
@@ -53,9 +53,9 @@ const Args = struct {
     pub fn init(allocator: std.mem.Allocator) !Self {
         return try argparse.parse(allocator, Self, struct {
             fn errorCheck(a: Self, stderr: *std.Io.Writer) !bool {
-                if (a.api_key == null and a.json_input_file == null) {
+                if (a.github_token == null and a.json_input_file == null) {
                     try stderr.print(
-                        "You must pass either an input file or an API key.\n",
+                        "You must pass either an input file or an GitHub token.\n",
                         .{},
                     );
                     return false;
@@ -196,9 +196,9 @@ pub fn main() !void {
         const data = try readFile(allocator, path);
         defer allocator.free(data);
         break :stats try Statistics.initFromJson(allocator, data);
-    } else if (args.api_key) |api_key| stats: {
+    } else if (args.github_token) |github_token| stats: {
         std.log.info("Collecting statistics from GitHub API", .{});
-        var client: HttpClient = try .init(allocator, api_key);
+        var client: HttpClient = try .init(allocator, github_token);
         defer client.deinit();
         break :stats try Statistics.init(
             &client,
