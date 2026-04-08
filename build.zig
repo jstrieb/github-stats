@@ -5,6 +5,9 @@ pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{
         .preferred_optimize_mode = .ReleaseSafe,
     });
+    const version = @import("build.zig.zon").version;
+    const options = b.addOptions();
+    options.addOption([]const u8, "version", version);
 
     const exe = b.addExecutable(.{
         .name = "github-stats",
@@ -14,6 +17,7 @@ pub fn build(b: *std.Build) !void {
             .optimize = optimize,
         }),
     });
+    exe.root_module.addImport("options", options.createModule());
     b.installArtifact(exe);
 
     const run_step = b.step("run", "Run the app");
@@ -77,6 +81,7 @@ pub fn build(b: *std.Build) !void {
                 .optimize = .ReleaseFast,
             }),
         });
+        cross_exe.root_module.addImport("options", options.createModule());
         release_step.dependOn(&b.addInstallArtifact(cross_exe, .{}).step);
     }
 }

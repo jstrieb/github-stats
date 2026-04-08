@@ -1,5 +1,6 @@
 const builtin = @import("builtin");
 const std = @import("std");
+const version = @import("options").version;
 
 const argparse = @import("argparse.zig");
 const glob = @import("glob.zig");
@@ -47,13 +48,16 @@ const Args = struct {
     languages_template: ?[]const u8 = null,
     max_backoff: ?usize = null,
     max_retries: ?usize = null,
+    version: bool = false,
 
     const Self = @This();
 
     pub fn init(allocator: std.mem.Allocator) !Self {
         return try argparse.parse(allocator, Self, struct {
             fn errorCheck(a: Self, stderr: *std.Io.Writer) !bool {
-                if (a.github_token == null and a.json_input_file == null) {
+                if (a.github_token == null and a.json_input_file == null and
+                    !a.version)
+                {
                     try stderr.print(
                         "You must pass either an input file or an GitHub token.\n",
                         .{},
@@ -164,6 +168,18 @@ pub fn main() !void {
 
     const args = try Args.init(allocator);
     defer args.deinit(allocator);
+    if (args.version) {
+        const stdout = std.fs.File.stdout();
+        var writer = stdout.writer(&.{});
+        try writer.interface.print(
+            \\GitHub Stats version {s}
+            \\https://github.com/jstrieb/github-stats
+            \\
+            \\Created by Jacob Strieb
+            \\
+        , .{version});
+        return;
+    }
     if (args.silent) {
         log_level = .err;
     } else if (args.debug) {

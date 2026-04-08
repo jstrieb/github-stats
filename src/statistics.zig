@@ -523,7 +523,7 @@ fn getLinesChanged(
             std.log.debug("Sleeping for {d}s. Waiting for {d} repo{s}.", .{
                 delay,
                 q.count() + 1,
-                if (q.count() != 0) "s" else "",
+                if (q.count() + 1 != 0) "s" else "",
             });
             std.Thread.sleep(delay * std.time.ns_per_s);
         }
