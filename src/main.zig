@@ -171,25 +171,17 @@ pub fn main() !void {
     } else if (args.verbose) {
         log_level = .info;
     }
-    const excluded_repos = if (args.excluded_repos) |excluded| excluded: {
-        var list = try std.ArrayList([]const u8).initCapacity(allocator, 16);
-        errdefer list.deinit(allocator);
-        var iterator = std.mem.tokenizeAny(u8, excluded, ", \t\r\n|\"'\x00");
-        while (iterator.next()) |pattern| {
-            try list.append(allocator, pattern);
-        }
-        break :excluded try list.toOwnedSlice(allocator);
-    } else null;
+    const excluded_repos =
+        if (args.excluded_repos) |excluded|
+            try splitList(allocator, excluded, " ,\t\r\n|\"'\x00")
+        else
+            null;
     defer if (excluded_repos) |excluded| allocator.free(excluded);
-    const excluded_langs = if (args.excluded_langs) |excluded| excluded: {
-        var list = try std.ArrayList([]const u8).initCapacity(allocator, 16);
-        errdefer list.deinit(allocator);
-        var iterator = std.mem.tokenizeAny(u8, excluded, ",\t\r\n|\"'\x00");
-        while (iterator.next()) |pattern| {
-            try list.append(allocator, std.mem.trim(u8, pattern, " "));
-        }
-        break :excluded try list.toOwnedSlice(allocator);
-    } else null;
+    const excluded_langs =
+        if (args.excluded_langs) |excluded|
+            try splitList(allocator, excluded, ",\t\r\n|\"'\x00")
+        else
+            null;
     defer if (excluded_langs) |excluded| allocator.free(excluded);
 
     var stats: Statistics = if (args.json_input_file) |path| stats: {
@@ -339,4 +331,18 @@ fn writeFile(
     var writer = out.writer(&write_buffer);
     try writer.interface.writeAll(data);
     try writer.interface.flush();
+}
+
+fn splitList(
+    allocator: std.mem.Allocator,
+    original: []const u8,
+    separators: []const u8,
+) ![][]const u8 {
+    var list = try std.ArrayList([]const u8).initCapacity(allocator, 16);
+    errdefer list.deinit(allocator);
+    var iterator = std.mem.tokenizeAny(u8, original, separators);
+    while (iterator.next()) |pattern| {
+        try list.append(allocator, std.mem.trim(u8, pattern, " "));
+    }
+    return try list.toOwnedSlice(allocator);
 }
