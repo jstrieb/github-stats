@@ -46,7 +46,6 @@ const Args = struct {
     languages_output_file: ?[]const u8 = null,
     overview_template: ?[]const u8 = null,
     languages_template: ?[]const u8 = null,
-    max_backoff: ?usize = null,
     max_retries: ?usize = null,
     version: bool = false,
 
@@ -210,7 +209,6 @@ pub fn main() !void {
         break :stats try Statistics.init(
             &client,
             allocator,
-            args.max_backoff,
             args.max_retries,
         );
     } else unreachable;

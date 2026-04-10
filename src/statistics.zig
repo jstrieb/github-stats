@@ -104,7 +104,6 @@ const Language = struct {
 pub fn init(
     client: *HttpClient,
     allocator: std.mem.Allocator,
-    max_backoff: ?usize,
     max_retries: ?usize,
 ) !Statistics {
     var arena = std.heap.ArenaAllocator.init(allocator);
@@ -112,7 +111,7 @@ pub fn init(
 
     var self: Statistics = try getRepos(allocator, &arena, client);
     errdefer self.deinit(allocator);
-    try self.getLinesChanged(&arena, client, max_backoff, max_retries);
+    try self.getLinesChanged(&arena, client, max_retries);
     return self;
 }
 
@@ -489,7 +488,6 @@ fn getLinesChanged(
     self: *Statistics,
     arena: *std.heap.ArenaAllocator,
     client: *HttpClient,
-    max_backoff: ?usize,
     max_retries: ?usize,
 ) !void {
     const T = struct {
@@ -510,7 +508,7 @@ fn getLinesChanged(
         }
         try q.add(.{
             .repo = repo,
-            .delay = 8,
+            .delay = 0,
             .timestamp = std.time.timestamp(),
             .retries = 0,
         });
@@ -531,15 +529,18 @@ fn getLinesChanged(
             .ok => {},
             .accepted => {
                 item.timestamp = std.time.timestamp() + item.delay;
+                // Note: this actually works way better with a very short delay,
+                // hence no exponential backoff
+                item.delay = std.crypto.random.intRangeAtMost(i64, 0, 2);
                 // Exponential backoff (in expectation) with jitter
-                item.delay += std.crypto.random.intRangeAtMost(
-                    i64,
-                    2,
-                    @max(item.delay, 2),
-                );
-                if (max_backoff) |backoff| {
-                    item.delay = @min(item.delay, backoff);
-                }
+                // item.delay += std.crypto.random.intRangeAtMost(
+                //     i64,
+                //     2,
+                //     @max(item.delay, 2),
+                // );
+                // if (max_backoff) |backoff| {
+                //     item.delay = @min(item.delay, backoff);
+                // }
                 item.retries += 1;
                 if (max_retries) |max| {
                     if (item.retries <= max) {
