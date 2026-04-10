@@ -1,11 +1,19 @@
 const std = @import("std");
+const git = @import("src/git.zig");
 
 pub fn build(b: *std.Build) !void {
     const default_target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{
         .preferred_optimize_mode = .ReleaseSafe,
     });
-    const version = @import("build.zig.zon").version;
+    var version: []const u8 = @import("build.zig.zon").version;
+    if (git.isInstalled(b.allocator)) {
+        version = try std.fmt.allocPrint(
+            b.allocator,
+            "{s} ({s})",
+            .{ version, try git.currentCommit(b.allocator) },
+        );
+    }
     const options = b.addOptions();
     options.addOption([]const u8, "version", version);
 

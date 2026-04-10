@@ -174,7 +174,6 @@ pub fn main() !void {
         try writer.interface.print(
             \\GitHub Stats version {s}
             \\https://github.com/jstrieb/github-stats
-            \\
             \\Created by Jacob Strieb
             \\
         , .{version});
