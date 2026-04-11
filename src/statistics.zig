@@ -531,16 +531,7 @@ fn getLinesChanged(
                 item.timestamp = std.time.timestamp() + item.delay;
                 // Note: this actually works way better with a very short delay,
                 // hence no exponential backoff
-                item.delay = std.crypto.random.intRangeAtMost(i64, 0, 2);
-                // Exponential backoff (in expectation) with jitter
-                // item.delay += std.crypto.random.intRangeAtMost(
-                //     i64,
-                //     2,
-                //     @max(item.delay, 2),
-                // );
-                // if (max_backoff) |backoff| {
-                //     item.delay = @min(item.delay, backoff);
-                // }
+                item.delay = std.crypto.random.intRangeAtMost(i64, 0, 4);
                 item.retries += 1;
                 if (max_retries) |max| {
                     if (item.retries <= max) {
@@ -551,9 +542,13 @@ fn getLinesChanged(
                 }
             },
             else => |status| {
-                std.log.err(
+                std.log.info(
                     "Failed to get contribution data for {s} ({?s})",
                     .{ item.repo.name, status.phrase() },
+                );
+                std.log.err(
+                    "Request failed with response {?s}",
+                    .{status.phrase()},
                 );
                 return error.RequestFailed;
             },
