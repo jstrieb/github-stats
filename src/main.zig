@@ -32,6 +32,9 @@ fn logFn(
     }
 }
 
+const embedded_overview_template = @embedFile("templates/overview.svg");
+const embedded_languages_template = @embedFile("templates/languages.svg");
+
 const Args = struct {
     github_token: ?[]const u8 = null,
     json_input_file: ?[]const u8 = null,
@@ -39,8 +42,8 @@ const Args = struct {
     silent: bool = false,
     debug: bool = false,
     verbose: bool = false,
-    excluded_repos: ?[]const u8 = null,
-    excluded_langs: ?[]const u8 = null,
+    exclude_repos: ?[]const u8 = null,
+    exclude_langs: ?[]const u8 = null,
     exclude_private: bool = false,
     overview_output_file: ?[]const u8 = null,
     languages_output_file: ?[]const u8 = null,
@@ -185,18 +188,18 @@ pub fn main() !void {
     } else if (args.verbose) {
         log_level = .info;
     }
-    const excluded_repos =
-        if (args.excluded_repos) |excluded|
-            try splitList(allocator, excluded, " ,\t\r\n|\"'\x00")
+    const exclude_repos =
+        if (args.exclude_repos) |exclude|
+            try splitList(allocator, exclude, " ,\t\r\n|\"'\x00")
         else
             null;
-    defer if (excluded_repos) |excluded| allocator.free(excluded);
-    const excluded_langs =
-        if (args.excluded_langs) |excluded|
-            try splitList(allocator, excluded, ",\t\r\n|\"'\x00")
+    defer if (exclude_repos) |exclude| allocator.free(exclude);
+    const exclude_langs =
+        if (args.exclude_langs) |exclude|
+            try splitList(allocator, exclude, ",\t\r\n|\"'\x00")
         else
             null;
-    defer if (excluded_langs) |excluded| allocator.free(excluded);
+    defer if (exclude_langs) |exclude| allocator.free(exclude);
 
     var stats: Statistics = if (args.json_input_file) |path| stats: {
         const data = try readFile(allocator, path);
@@ -251,7 +254,7 @@ pub fn main() !void {
     defer aggregate_stats.languages.deinit();
     defer aggregate_stats.language_colors.deinit();
     for (stats.repositories) |repository| {
-        if (glob.matchAny(excluded_repos orelse &.{}, repository.name) or
+        if (glob.matchAny(exclude_repos orelse &.{}, repository.name) or
             (args.exclude_private and repository.private))
         {
             continue;
@@ -262,7 +265,7 @@ pub fn main() !void {
         aggregate_stats.views += repository.views;
         aggregate_stats.repos += 1;
         if (repository.languages) |langs| for (langs) |language| {
-            if (glob.matchAny(excluded_langs orelse &.{}, language.name)) {
+            if (glob.matchAny(exclude_langs orelse &.{}, language.name)) {
                 continue;
             }
             if (language.color) |color| {
@@ -294,7 +297,7 @@ pub fn main() !void {
                 if (args.overview_template) |template|
                     try readFile(arena.allocator(), template)
                 else
-                    @embedFile("templates/overview.svg"),
+                    embedded_overview_template,
             ),
         );
 
@@ -306,7 +309,7 @@ pub fn main() !void {
                 if (args.languages_template) |template|
                     try readFile(arena.allocator(), template)
                 else
-                    @embedFile("templates/languages.svg"),
+                    embedded_languages_template,
             ),
         );
     }

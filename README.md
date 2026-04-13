@@ -57,17 +57,13 @@ The GitHub statistics API returns inaccurate results in some situations:
   - On the other hand, GitHub refuses to count lines of code for repositories
     with more than 10,000 commits, so contributions to those will not be
     reflected in the data at all
-  - GitHub no longer supports computing contributor stats for private repos on
-    free accounts, so we compute them ourselves by cloning the repo locally and
-    tallying the stats with the git CLI – our computed totals may differ from
-    GitHub's
 - Only repositories with commit contributions are counted, so if you only open
   an issue on a repo, it will not show up in the statistics
   - Repos you created and own may not be counted if you never commit to them, or
     if the committer email is not connected to your GitHub account
 
 If the calculated numbers seem strange, run the CLI locally and dump JSON output
-to determine which repositories are affecting the statistics in unexpected ways.
+to determine which repositories are skewing the statistics in unexpected ways.
 
 
 # Installation
@@ -82,6 +78,7 @@ If this project is useful to you, please support it!
 - Star the repository (and follow me on GitHub for more)
 - Share and upvote on sites like Twitter, Reddit, and Hacker News
 - Report any bugs, glitches, or errors that you find
+- [Check out my other projects](https://jstrieb.github.io/projects/)
 
 These things motivate me to keep sharing what I build, and they provide
 validation that my work is appreciated! They also help me improve the project.
