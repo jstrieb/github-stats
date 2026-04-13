@@ -51,6 +51,8 @@ const Args = struct {
     languages_template: ?[]const u8 = null,
     max_retries: ?usize = null,
     version: bool = false,
+    dump_overview_template: ?[]const u8 = null,
+    dump_languages_template: ?[]const u8 = null,
 
     const Self = @This();
 
@@ -170,6 +172,14 @@ pub fn main() !void {
 
     const args = try Args.init(allocator);
     defer args.deinit(allocator);
+    if (args.silent) {
+        log_level = .err;
+    } else if (args.debug) {
+        log_level = .debug;
+    } else if (args.verbose) {
+        log_level = .info;
+    }
+
     if (args.version) {
         const stdout = std.fs.File.stdout();
         var writer = stdout.writer(&.{});
@@ -181,13 +191,17 @@ pub fn main() !void {
         , .{version});
         return;
     }
-    if (args.silent) {
-        log_level = .err;
-    } else if (args.debug) {
-        log_level = .debug;
-    } else if (args.verbose) {
-        log_level = .info;
+
+    if (args.dump_overview_template) |path| {
+        try writeFile(path, embedded_overview_template);
+        return;
     }
+
+    if (args.dump_languages_template) |path| {
+        try writeFile(path, embedded_languages_template);
+        return;
+    }
+
     const exclude_repos =
         if (args.exclude_repos) |exclude|
             try splitList(allocator, exclude, " ,\t\r\n|\"'\x00")
