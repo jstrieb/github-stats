@@ -40,9 +40,11 @@ jobs:
       run: |
         ./zig-out/bin/github_stats
       env:
-        API_KEY: ${{ secrets.GITHUB_TOKEN }}
-        EXCLUDED_REPOS: ${{ secrets.EXCLUDED_REPOS }}
-        EXCLUDED_LANGS: ${{ secrets.EXCLUDED_LANGS }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        EXCLUDE_REPOS: ${{ secrets.EXCLUDE_REPOS }}
+        EXCLUDE_LANGS: ${{ secrets.EXCLUDE_LANGS }}
+        EXCLUDE_PRIVATE: "false"
+        DEBUG: "false"
 
     - name: Commit to the repo
       run: |
