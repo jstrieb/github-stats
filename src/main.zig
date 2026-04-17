@@ -49,7 +49,7 @@ const Args = struct {
     languages_output_file: ?[]const u8 = null,
     overview_template: ?[]const u8 = null,
     languages_template: ?[]const u8 = null,
-    max_retries: ?usize = null,
+    max_retries: ?usize = 60,
     version: bool = false,
     dump_overview_template: ?[]const u8 = null,
     dump_languages_template: ?[]const u8 = null,
@@ -59,8 +59,8 @@ const Args = struct {
     pub fn init(allocator: std.mem.Allocator) !Self {
         return try argparse.parse(allocator, Self, struct {
             fn errorCheck(a: Self, stderr: *std.Io.Writer) !bool {
-                if (a.github_token == null and a.json_input_file == null and
-                    !a.version)
+                if ((a.github_token == null or a.github_token.?.len == 0) and
+                    a.json_input_file == null and !a.version)
                 {
                     try stderr.print(
                         "You must pass either an input file or an GitHub token.\n",
