@@ -61,6 +61,13 @@ The GitHub statistics API returns inaccurate results in some situations:
   an issue on a repo, it will not show up in the statistics
   - Repos you created and own may not be counted if you never commit to them, or
     if the committer email is not connected to your GitHub account
+- [The GitHub API endpoint for computing contributor statistics no longer works
+  reliably](https://github.com/orgs/community/discussions/192970), so we compute
+  the statistics ourselves by cloning each repository locally and tallying lines
+  changed with the `git` CLI
+  - Our computed totals likely under-count relative to GitHub's, since theirs
+    correctly attribute authorship for contributions to pull requests with
+    several authors that end up squashed and merged by just one author
 
 If the calculated numbers seem strange, run the CLI locally and dump JSON output
 to determine which repositories are skewing the statistics in unexpected ways.
