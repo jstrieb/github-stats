@@ -33,6 +33,6 @@ jobs:
           cd zig-out/bin/
           gh release create \
             "${TAG}" \
-            --title "${TAG} Release" \
+            --title "${TAG}" \
             *
         )
