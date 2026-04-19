@@ -89,7 +89,10 @@ pub fn getLinesChanged(
     const log = try std.process.Child.run(.{
         .allocator = allocator,
         .argv = log_args,
-        .max_output_bytes = 64 * 1024 * 1024 * 1024,
+        .max_output_bytes = @min(
+            64 * 1024 * 1024 * 1024,
+            std.math.maxInt(usize),
+        ),
     });
     switch (log.term) {
         .Exited => |v| if (v != 0) return error.LogFailed,
