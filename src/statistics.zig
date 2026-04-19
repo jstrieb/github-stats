@@ -585,7 +585,7 @@ fn getLinesChanged(
             std.Thread.sleep(delay * std.time.ns_per_s);
         }
         switch (try item.repo.getLinesChanged(arena, client, self.user)) {
-            .ok => {},
+            .ok, .forbidden => {},
             .accepted => {
                 item.timestamp = std.time.timestamp() + item.delay;
                 // Note: this actually works way better with a very short delay,
