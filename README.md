@@ -134,6 +134,9 @@ and retrieve the images.
      (separated by commas) to a secret called `EXCLUDE_REPOS`.
    - To exclude some languages from the aggregate statistics, add them
      (separated by commas) to a secret called `EXCLUDE_LANGS`.
+   - Lists for `EXCLUDE_REPOS` and `EXCLUDE_LANGS` can use globbing patterns.
+     For example, to exclude all repos by "@jstrieb", add `jstrieb/*` to
+     `EXCLUDE_REPOS`.
    - These can also be set directly in [the Actions
      workflow](.github/workflows/main.yml), but you should set them as secrets
      if you want to keep the repository names or languages private.
