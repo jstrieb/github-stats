@@ -613,6 +613,12 @@ fn getLinesChanged(
                             error.GitNotInstalled => 0,
                             else => return e,
                         };
+                        std.log.info("Got {d} line{s} changed by {s} in {s}", .{
+                            item.repo.lines_changed,
+                            if (item.repo.lines_changed != 1) "s" else "",
+                            self.user,
+                            item.repo.name,
+                        });
                     }
                 } else {
                     try q.add(item);
