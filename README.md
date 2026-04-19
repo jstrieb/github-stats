@@ -3,143 +3,211 @@
 <!--
 https://github.community/t/support-theme-context-for-images-in-light-vs-dark-mode/147981/84
 -->
+
+<div align="center">
 <a href="https://github.com/jstrieb/github-stats">
-<img src="https://github.com/jstrieb/github-stats/blob/master/generated/overview.svg#gh-dark-mode-only" />
-<img src="https://github.com/jstrieb/github-stats/blob/master/generated/languages.svg#gh-dark-mode-only" />
-<img src="https://github.com/jstrieb/github-stats/blob/master/generated/overview.svg#gh-light-mode-only" />
-<img src="https://github.com/jstrieb/github-stats/blob/master/generated/languages.svg#gh-light-mode-only" />
+<img src="https://github.com/jstrieb/github-stats/blob/generated/overview.svg#gh-dark-mode-only" />
+<img src="https://github.com/jstrieb/github-stats/blob/generated/languages.svg#gh-dark-mode-only" />
+<img src="https://github.com/jstrieb/github-stats/blob/generated/overview.svg#gh-light-mode-only" />
+<img src="https://github.com/jstrieb/github-stats/blob/generated/languages.svg#gh-light-mode-only" />
 </a>
+</div>
 
 Generate visualizations of GitHub user and repository statistics with GitHub
-Actions. Visualizations can include data for both private repositories, and for
+Actions. Visualizations can include data from private repositories, and from
 repositories you have contributed to, but do not own.
 
 Generated images automatically switch between GitHub light theme and GitHub
 dark theme.
 
+
 ## Background
 
-When someone views a profile on GitHub, it is often because they are curious
-about a user's open source projects and contributions. Unfortunately, that
-user's stars, forks, and pinned repositories do not necessarily reflect the
-contributions they make to private repositories. The data likewise does not
-present a complete picture of the user's total contributions beyond the current
-year.
+When someone views a GitHub profile, it is often because they are curious about
+the user's open-source contributions. Unfortunately, that user's stars, forks,
+and pinned repositories do not necessarily reflect the contributions they make
+to private repositories. The data likewise does not present a complete picture
+of the user's total contributions beyond the current year.
 
 This project aims to collect a variety of profile and repository statistics
 using the GitHub API. It then generates images that can be displayed in
 repository READMEs, or in a user's [Profile
 README](https://docs.github.com/en/github/setting-up-and-managing-your-github-profile/managing-your-profile-readme).
+It also dumps all statistics to a JSON file that can be used for further data
+analysis.
 
-Since the project runs on GitHub Actions, no server is required to regularly
-regenerate the images with updated statistics. Likewise, since the user runs
-the analysis code themselves via GitHub Actions, they can use their GitHub
-access token to collect statistics on private repositories that an external
-service would be unable to access.
+Since this project runs on GitHub Actions, no server is required to regularly
+regenerate the images with updated statistics. Likewise, since the user runs the
+analysis code themselves via GitHub Actions, they can use their GitHub access
+token to collect statistics on private repositories that an external service
+would be unable to access.
+
 
 ## Disclaimer
 
-If the project is used with an access token that has sufficient permissions to
-read private repositories, it may leak details about those repositories in
-error messages. For example, the `aiohttp` library—used for asynchronous API
-requests—may include the requested URL in exceptions, which can leak the name
-of private repositories. If there is an exception caused by `aiohttp`, this
-exception will be viewable in the Actions tab of the repository fork, and
-anyone may be able to see the name of one or more private repositories.
+The GitHub statistics API returns inaccurate results in some situations:
 
-Due to some issues with the GitHub statistics API, there are some situations
-where it returns inaccurate results. Specifically, the repository view count
-statistics and total lines of code modified are probably somewhat inaccurate.
-Unexpectedly, these values will become more accurate over time as GitHub
-caches statistics for your repositories. Additionally, repositories that were
-last contributed to more than a year ago may not be included in the statistics
-due to limitations in the results returned by the API.
+- Repository view count statistics often seem too low, and many referring sites
+  are not captured
+  - If you lack permissions to access the view count for a repository, it will
+    be tallied as zero views – this is common for external repositories where
+    your only contribution is making a pull request
+- Total lines of code modified may be inflated – GitHub counts changes to files like
+  `package-lock.json` that may impact the line count in surprising ways
+  - On the other hand, GitHub refuses to count lines of code for repositories
+    with more than 10,000 commits, so contributions to those will not be
+    reflected in the data at all
+- Only repositories with commit contributions are counted, so if you only open
+  an issue on a repo, it will not show up in the statistics
+  - Repos you created and own may not be counted if you never commit to them, or
+    if the committer email is not connected to your GitHub account
+- [The GitHub API endpoint for computing contributor statistics no longer works
+  reliably](https://github.com/orgs/community/discussions/192970), so we compute
+  the statistics ourselves by cloning each repository locally and tallying lines
+  changed with the `git` CLI
+  - Our computed totals likely under-count relative to GitHub's, since theirs
+    correctly attribute authorship for contributions to pull requests with
+    several authors that end up squashed and merged by just one author
 
-For more information on inaccuracies, see issue
-[#2](https://github.com/jstrieb/github-stats/issues/2),
-[#3](https://github.com/jstrieb/github-stats/issues/3), and
-[#13](https://github.com/jstrieb/github-stats/issues/13).
+If the calculated numbers seem strange, run the CLI locally and dump JSON output
+to determine which repositories are skewing the statistics in unexpected ways.
+See [below](#analyzing-the-data) for tips.
 
-# Installation
 
-<!-- TODO: Add details and screenshots -->
+## Installation
 
-1. Create a personal access token (not the default GitHub Actions token) using
-   the instructions
-   [here](https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token).
-   Personal access token must have permissions: `read:user` and `repo`. Copy
-   the access token when it is generated – if you lose it, you will have to
-   regenerate the token.
-   - Some users are reporting that it can take a few minutes for the personal
-     access token to work. For more, see 
-     [#30](https://github.com/jstrieb/github-stats/issues/30).
-2. Create a copy of this repository by clicking
-   [here](https://github.com/jstrieb/github-stats/generate). Note: this is
-   **not** the same as forking a copy because it copies everything fresh,
-   without the huge commit history. 
-3. Go to the "Secrets" page of your copy of the repository. If this is the
-   README of your copy, click [this link](../../settings/secrets/actions) to go
-   to the "Secrets" page. Otherwise, go to the "Settings" tab of the
-   newly-created repository and go to the "Secrets" page (bottom left).
-4. Create a new secret with the name `ACCESS_TOKEN` and paste the copied
-   personal access token as the value.
-5. It is possible to change the type of statistics reported by adding other
-   repository secrets. 
-   - To ignore certain repos, add them (in owner/name format e.g.,
-     `jstrieb/github-stats`) separated by commas to a new secret—created as
-     before—called `EXCLUDED`.
-   - To ignore certain languages, add them (separated by commas) to a new
-     secret called `EXCLUDED_LANGS`. For example, to exclude HTML and TeX you
-     could set the value to `html,tex`.
-   - To show statistics only for "owned" repositories and not forks with
-     contributions, add an environment variable (under the `env` header in the
-     [main
-     workflow](https://github.com/jstrieb/github-stats/blob/master/.github/workflows/main.yml))
-     called `EXCLUDE_FORKED_REPOS` with a value of `true`.
-   - These other values are added as secrets by default to prevent leaking
-     information about private repositories. If you're not worried about that,
-     you can change the values directly [in the Actions workflow
-     itself](https://github.com/jstrieb/github-stats/blob/05de1314b870febd44d19ad2f55d5e59d83f5857/.github/workflows/main.yml#L48-L53).
-6. Go to the [Actions
-   Page](../../actions?query=workflow%3A"Generate+Stats+Images") and press "Run
+To make your own statistics images: make a copy of this repository, make a
+GitHub API token, add the token to the repository, run the Actions workflow,
+and retrieve the images.
+
+1. [Make a "**classic**" personal access token with `read:user`, `user:email`,
+   and `repo`
+   permissions.](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
+   1. [Navigate to the personal access tokens (classic)
+      page.](https://github.com/settings/tokens) Open that link in a new tab,
+      or proceed with the steps below.
+      1. Click your avatar in the top right corner, then "Settings" on the menu
+         that drops down.
+      1. Click "Developer settings" from the menu on the left.
+      1. Click "Personal access tokens", then "Tokens (classic)" from the menu
+         on the left.
+   1. Click "Generate new token" in the top right, then "Generate new token
+      (classic)" in the menu that drops down.
+   1. Set the expiration date to "none" (unless you want to periodically
+      regenerate this token).
+   1. Check `read:user`, `user:email`, and `repo` permissions.
+      - `read:user` and `repo` permissions are necessary for reading user and
+        repository metadata to calculate statistics.
+      - `user:email` permission is necessary for correctly attributing commits
+        to the user when cloning repositories locally to compute lines of code
+        changed.
+   1. Click the green "Generate token" button at the bottom.
+   1. **Copy the token and save it somewhere.** If you lose it, you will not be
+      able to access it again, and will have to regenerate a new one. I keep
+      mine saved along with the GitHub entry in my password manager.
+   1. Some users report that it can take some time for the personal access
+      token to take effect. For more information, see
+      [#30](https://github.com/jstrieb/github-stats/issues/30).
+1. Create a copy of this repository by clicking
+   [here](https://github.com/jstrieb/github-stats/generate).
+   - Equivalently, click the big, green "Use this template" button at the top
+     left of the page, then click "Create a new repository."
+   - Note: this is **not** the same as forking a copy because it copies
+     everything fresh, without the huge commit history.
+1. Create a new repository secret named `ACCESS_TOKEN` with your personal
+   access token from the first step.
+   1. [Go to the "New secret" page for your copy of this repository by clicking
+      this link.](../../settings/secrets/actions/new)
+      - If the link doesn't work, try clicking it from your copy of this
+        repository.
+      - Alternatively, go to the page manually.
+        1. Click "Settings" for your copy of this repository.
+        1. Click "Secrets and variables" on the left, then "Actions" from the
+           menu that drops down.
+        1. Click the green "New repository secret" button on the "Actions
+           secrets and variables" page.
+   1. Name your secret `ACCESS_TOKEN`.
+   1. Paste your personal access token from step 1 into the large "Secret" text
+      box.
+1. (Optional) Make other secrets for more configuration.
+   - To exclude some repositories from the aggregate statistics, add them
+     (separated by commas) to a secret called `EXCLUDE_REPOS`.
+   - To exclude some languages from the aggregate statistics, add them
+     (separated by commas) to a secret called `EXCLUDE_LANGS`.
+   - Lists for `EXCLUDE_REPOS` and `EXCLUDE_LANGS` can use globbing patterns.
+     For example, to exclude all repos by "@jstrieb", add `jstrieb/*` to
+     `EXCLUDE_REPOS`.
+   - These can also be set directly in [the Actions
+     workflow](.github/workflows/main.yml), but you should set them as secrets
+     if you want to keep the repository names or languages private.
+   - Other configuration options can be set as environment variables or command
+     line arguments by directly editing [the Actions
+     workflow](.github/workflows/main.yml).
+1. Go to the [Actions
+   page](../../actions?query=workflow%3A"Generate+Stats+Images") and click "Run
    Workflow" on the right side of the screen to generate images for the first
-   time. 
-   - The images will be automatically regenerated every 24 hours, but they can
-     be regenerated manually by running the workflow this way.
-7. Take a look at the images that have been created in the
-   [`generated`](generated) folder.
-8. To add your statistics to your GitHub Profile README, copy and paste the
-   following lines of code into your markdown content. Change the `username`
-   value to your GitHub username.
-   ```md
-   ![](https://raw.githubusercontent.com/username/github-stats/master/generated/overview.svg#gh-dark-mode-only)
-   ![](https://raw.githubusercontent.com/username/github-stats/master/generated/overview.svg#gh-light-mode-only)
+   time.
+   - They automatically regenerate every 24 hours, but they can be manually
+     regenerated by running the workflow this way.
+1. Take a look at the images that have been created on the [`generated`
+   branch](tree/generated/).
+   - The [`overview.svg`](tree/generated/overview.svg) file.
+   - The [`languages.svg`](tree/generated/languages.svg) file.
+1. To add the statistics to your GitHub profile README, copy and paste the
+   following lines of code into your markdown content.
+   - Replace `[USERNAME]` in the links below with your own username.
+   ``` markdown
+   ![](https://github.com/[USERNAME]/github-stats/blob/generated/overview.svg#gh-dark-mode-only)
+   ![](https://github.com/[USERNAME]/github-stats/blob/generated/overview.svg#gh-light-mode-only)
+   ![](https://github.com/[USERNAME]/github-stats/blob/generated/languages.svg#gh-dark-mode-only)
+   ![](https://github.com/[USERNAME]/github-stats/blob/generated/languages.svg#gh-light-mode-only)
+   [Created by `jstrieb/github-stats`.](https://github.com/jstrieb/github-stats)
    ```
-   ```md
-   ![](https://raw.githubusercontent.com/username/github-stats/master/generated/languages.svg#gh-dark-mode-only)
-   ![](https://raw.githubusercontent.com/username/github-stats/master/generated/languages.svg#gh-light-mode-only)
-   ```
-9. Link back to this repository so that others can generate their own
-   statistics images.
-10. Star this repo if you like it!
+1. Star this repo if you like it!
 
 
-# Support the Project
+## Analyzing the Data
 
-There are a few things you can do to support the project:
+Using the `github-stats` CLI (available on the
+[releases](https://github.com/jstrieb/github-stats/releases/latest) page) to
+run locally, you can dump raw statistics data to a JSON file using the
+`--json-output-file` command-line argument. Then, you can import the JSON file
+into your programming language of choice and start analyzing.
+
+My preference is to use [`jq`](https://github.com/jqlang/jq) from the command
+line. The command-line examples below assume the JSON file is stored in
+`stats.json`.
+
+
+### List all
+
+List all repositories, sorted with most-viewed at the bottom.
+
+``` bash
+jq '.repositories | sort_by(.views) | del(.[].languages)' stats.json
+```
+
+In that command, replace `.views` with any other field name (such as
+`.lines_changed` or `.stars`) to sort by that field instead. The command
+removes the languages field (using `del()`) because it can clutter the output,
+making it hard to read.
+
+
+## Support the Project
+
+If this project is useful to you, please support it!
 
 - Star the repository (and follow me on GitHub for more)
 - Share and upvote on sites like Twitter, Reddit, and Hacker News
 - Report any bugs, glitches, or errors that you find
+- [Check out my other projects](https://jstrieb.github.io/projects/)
 
 These things motivate me to keep sharing what I build, and they provide
-validation that my work is appreciated! They also help me improve the
-project. Thanks in advance!
+validation that my work is appreciated! They also help me improve the project.
+Thanks in advance!
 
 If you are insistent on spending money to show your support, I encourage you to
-instead make a generous donation to one of the following organizations. By advocating
-for Internet freedoms, organizations like these help me to feel comfortable
-releasing work publicly on the Web.
+instead make a generous donation to one of the following organizations.
 
 - [Electronic Frontier Foundation](https://supporters.eff.org/donate/)
 - [Signal Foundation](https://signal.org/donate/)
@@ -147,9 +215,30 @@ releasing work publicly on the Web.
 - [The Internet Archive](https://archive.org/donate/index.php)
 
 
-# Related Projects
+## Project Status
+
+This project is actively maintained, but not actively developed. In other
+words, I will fix bugs, but will rarely add features (if at all). If there are
+no recent commits, it means that everything has been running smoothly!
+
+GitHub's APIs often have unexpected errors, downtime, and strange,
+intermittent, undocumented behavior. Issues generating statistics images often
+resolve themselves within a day or two, without any changes to this code or
+repository.
+
+If you want to contribute to the project, please open an issue and discuss
+first. Pull requests that are not discussed with me ahead of time may be
+ignored. It's nothing personal, I'm just busy, and reviewing others' code is
+nowhere near as fun as working on other projects.
+
+Even if something were to happen to me, and I could not continue to work on the
+project, it will continue to work as long as the GitHub API endpoints it uses
+remain active and unchanged.
+
+
+## Related Projects
 
 - Inspired by a desire to improve upon
   [anuraghazra/github-readme-stats](https://github.com/anuraghazra/github-readme-stats)
-- Makes use of [GitHub Octicons](https://primer.style/octicons/) to precisely
-  match the GitHub UI
+- Uses [GitHub Octicons](https://primer.style/octicons/) to precisely match the
+  GitHub UI
