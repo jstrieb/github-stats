@@ -24,7 +24,7 @@ dark theme.
 ## Background
 
 When someone views a GitHub profile, it is often because they are curious about
-the user's open source contributions. Unfortunately, that user's stars, forks,
+the user's open-source contributions. Unfortunately, that user's stars, forks,
 and pinned repositories do not necessarily reflect the contributions they make
 to private repositories. The data likewise does not present a complete picture
 of the user's total contributions beyond the current year.
@@ -94,13 +94,13 @@ and retrieve the images.
    1. Click "Generate new token" in the top right, then "Generate new token
       (classic)" in the menu that drops down.
    1. Set the expiration date to "none" (unless you want to periodically
-      regenerate this key).
-   1. Check `read:user` and `user:email` and `repo` permissions.
+      regenerate this token).
+   1. Check `read:user`, `user:email`, and `repo` permissions.
       - `read:user` and `repo` permissions are necessary for reading user and
-        repository metadata to calculate statistics
+        repository metadata to calculate statistics.
       - `user:email` permission is necessary for correctly attributing commits
         to the user when cloning repositories locally to compute lines of code
-        changed
+        changed.
    1. Click the green "Generate token" button at the bottom.
    1. **Copy the token and save it somewhere.** If you lose it, you will not be
       able to access it again, and will have to regenerate a new one. I keep
@@ -154,7 +154,7 @@ and retrieve the images.
    - The [`overview.svg`](tree/generated/overview.svg) file.
    - The [`languages.svg`](tree/generated/languages.svg) file.
 1. To add the statistics to your GitHub profile README, copy and paste the
-   following lines of code into your markdown content. 
+   following lines of code into your markdown content.
    - Replace `[USERNAME]` in the links below with your own username.
    ``` markdown
    ![](https://github.com/[USERNAME]/github-stats/blob/generated/overview.svg#gh-dark-mode-only)
@@ -171,17 +171,17 @@ and retrieve the images.
 Using the `github-stats` CLI (available on the
 [releases](https://github.com/jstrieb/github-stats/releases/latest) page) to
 run locally, you can dump raw statistics data to a JSON file using the
-`--json-output-file` command line argument. Then, you can import the JSON file
-into your programming language of choice and start analyzing. 
+`--json-output-file` command-line argument. Then, you can import the JSON file
+into your programming language of choice and start analyzing.
 
 My preference is to use [`jq`](https://github.com/jqlang/jq) from the command
-line. The command line examples below assume the JSON file is stored in
+line. The command-line examples below assume the JSON file is stored in
 `stats.json`.
 
 
 ### List all
 
-List all repositories, sorted with most-viewed at the bottom. 
+List all repositories, sorted with most-viewed at the bottom.
 
 ``` bash
 jq '.repositories | sort_by(.views) | del(.[].languages)' stats.json
