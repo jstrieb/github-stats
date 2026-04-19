@@ -47,27 +47,27 @@ would be unable to access.
 
 The GitHub statistics API returns inaccurate results in some situations:
 
+- Total lines of code modified may be inflated – GitHub counts changes to files
+  like `package-lock.json` that may impact the line count in surprising ways
+  - On the other hand, GitHub refuses to count lines of code for repositories
+    with more than 10,000 commits, so contributions to those will not be
+    reflected in the data at all
+  - [The GitHub API endpoint for computing contributor statistics no longer
+    works reliably](https://github.com/orgs/community/discussions/192970), so we
+    compute the statistics ourselves by cloning each repository locally and
+    tallying lines changed with the `git` CLI
+    - Our computed totals likely under-count relative to GitHub's, since theirs
+      correctly attribute authorship for contributions to pull requests with
+      several authors that end up squashed and merged by just one author
 - Repository view count statistics often seem too low, and many referring sites
   are not captured
   - If you lack permissions to access the view count for a repository, it will
     be tallied as zero views – this is common for external repositories where
     your only contribution is making a pull request
-- Total lines of code modified may be inflated – GitHub counts changes to files like
-  `package-lock.json` that may impact the line count in surprising ways
-  - On the other hand, GitHub refuses to count lines of code for repositories
-    with more than 10,000 commits, so contributions to those will not be
-    reflected in the data at all
 - Only repositories with commit contributions are counted, so if you only open
   an issue on a repo, it will not show up in the statistics
   - Repos you created and own may not be counted if you never commit to them, or
     if the committer email is not connected to your GitHub account
-- [The GitHub API endpoint for computing contributor statistics no longer works
-  reliably](https://github.com/orgs/community/discussions/192970), so we compute
-  the statistics ourselves by cloning each repository locally and tallying lines
-  changed with the `git` CLI
-  - Our computed totals likely under-count relative to GitHub's, since theirs
-    correctly attribute authorship for contributions to pull requests with
-    several authors that end up squashed and merged by just one author
 
 If the calculated numbers seem strange, run the CLI locally and dump JSON output
 to determine which repositories are skewing the statistics in unexpected ways.
