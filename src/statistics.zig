@@ -1,9 +1,11 @@
 const std = @import("std");
+const git = @import("git.zig");
 const HttpClient = @import("http_client.zig");
 
 repositories: []Repository,
 user: []const u8,
 name: []const u8,
+emails: [][]const u8,
 repo_contributions: u32 = 0,
 issue_contributions: u32 = 0,
 commit_contributions: u32 = 0,
@@ -135,12 +137,17 @@ pub fn deinit(self: Statistics, allocator: std.mem.Allocator) void {
     allocator.free(self.repositories);
     allocator.free(self.user);
     allocator.free(self.name);
+    for (self.emails) |email| {
+        allocator.free(email);
+    }
+    allocator.free(self.emails);
 }
 
 fn getBasicInfo(client: *HttpClient, arena: *std.heap.ArenaAllocator) !struct {
     years: []u32,
     user: []const u8,
     name: ?[]const u8,
+    emails: [][]const u8,
 } {
     std.log.info("Getting contribution years...", .{});
     const response = try client.graphql(
@@ -174,10 +181,43 @@ fn getBasicInfo(client: *HttpClient, arena: *std.heap.ArenaAllocator) !struct {
         response.body,
         .{ .ignore_unknown_fields = true, .allocate = .alloc_always },
     )).data.viewer;
+
+    std.log.info("Getting contributor emails...", .{});
+    const email_response =
+        try client.rest("https://api.github.com/user/emails");
+    defer client.allocator.free(email_response.body);
+    var emails: [][]const u8 = &.{};
+    if (email_response.status == .ok) {
+        const parsed_emails = (try std.json.parseFromSliceLeaky(
+            []struct { email: []const u8 },
+            arena.allocator(),
+            email_response.body,
+            .{ .ignore_unknown_fields = true, .allocate = .alloc_always },
+        ));
+        if (parsed_emails.len > 0) {
+            emails = try arena.allocator().alloc([]const u8, parsed_emails.len);
+            for (parsed_emails, emails) |src, *dest| {
+                dest.* = src.email;
+            }
+        }
+    } else {
+        std.log.err("Failed to get user emails. " ++
+            "Token may be missing `user:email` permission.", .{});
+    }
+    if (emails.len == 0) {
+        emails = try arena.allocator().alloc([]const u8, 1);
+        emails[0] = try std.fmt.allocPrint(
+            arena.allocator(),
+            "{s}@users.noreply.github.com",
+            .{parsed.login},
+        );
+    }
+
     return .{
         .years = parsed.contributionsCollection.contributionYears,
         .user = parsed.login,
         .name = parsed.name,
+        .emails = emails,
     };
 }
 
@@ -430,6 +470,7 @@ fn getRepos(
     var result: Statistics = .{
         .user = undefined,
         .name = undefined,
+        .emails = undefined,
         .repositories = undefined,
     };
     var repositories: std.ArrayList(Repository) =
@@ -449,6 +490,28 @@ fn getRepos(
     } else {
         std.log.info("Getting data for user {s}...", .{info.user});
     }
+
+    result.user = try allocator.dupe(u8, info.user);
+    errdefer allocator.free(result.user);
+    result.name = try allocator.dupe(u8, info.name orelse info.user);
+    errdefer allocator.free(result.name);
+
+    result.emails = try allocator.alloc([]const u8, info.emails.len);
+    errdefer allocator.free(result.emails);
+    for (result.emails, info.emails, 0..) |*dest, src, i| {
+        errdefer {
+            for (result.emails[0..i]) |email| {
+                allocator.free(email);
+            }
+        }
+        dest.* = try allocator.dupe(u8, src);
+    }
+    errdefer {
+        for (result.emails) |email| {
+            allocator.free(email);
+        }
+    }
+
     for (info.years) |year| {
         try getReposByYear(.{
             .allocator = allocator,
@@ -477,10 +540,6 @@ fn getRepos(
         }
     }.lessThanFn);
 
-    result.user = try allocator.dupe(u8, info.user);
-    errdefer allocator.free(result.user);
-    result.name = try allocator.dupe(u8, info.name orelse info.user);
-    errdefer allocator.free(result.name);
     return result;
 }
 
@@ -536,6 +595,21 @@ fn getLinesChanged(
                 if (max_retries) |max| {
                     if (item.retries <= max) {
                         try q.add(item);
+                    } else {
+                        std.log.info(
+                            "Cloning {s} to get lines changed...",
+                            .{item.repo.name},
+                        );
+                        item.repo.lines_changed = git.getLinesChanged(
+                            arena.allocator(),
+                            self.user,
+                            client.token,
+                            item.repo.name,
+                            self.emails,
+                        ) catch |e| switch (e) {
+                            error.GitNotInstalled => 0,
+                            else => return e,
+                        };
                     }
                 } else {
                     try q.add(item);

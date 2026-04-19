@@ -7,6 +7,7 @@ const std = @import("std");
 allocator: std.mem.Allocator,
 client: std.http.Client,
 bearer: []const u8,
+token: []const u8,
 
 const Self = @This();
 const Response = struct {
@@ -21,16 +22,22 @@ const Request = struct {
 };
 
 pub fn init(allocator: std.mem.Allocator, token: []const u8) !Self {
+    const bearer = try std.fmt.allocPrint(allocator, "Bearer {s}", .{token});
+    errdefer allocator.free(bearer);
+    const cloned_token = try allocator.dupe(u8, token);
+    errdefer allocator.free(cloned_token);
     return .{
         .allocator = allocator,
         .client = .{ .allocator = allocator },
-        .bearer = try std.fmt.allocPrint(allocator, "Bearer {s}", .{token}),
+        .bearer = bearer,
+        .token = cloned_token,
     };
 }
 
 pub fn deinit(self: *Self) void {
     self.client.deinit();
     self.allocator.free(self.bearer);
+    self.allocator.free(self.token);
 }
 
 pub fn fetch(self: *Self, request: Request, retries: isize) !Response {

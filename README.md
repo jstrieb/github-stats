@@ -80,7 +80,8 @@ To make your own statistics images: make a copy of this repository, make a
 GitHub API token, add the token to the repository, run the Actions workflow,
 and retrieve the images.
 
-1. [Make a "**classic**" personal access token with `read:user` and `repo`
+1. [Make a "**classic**" personal access token with `read:user`, `user:email`,
+   and `repo`
    permissions.](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
    1. [Navigate to the personal access tokens (classic)
       page.](https://github.com/settings/tokens) Open that link in a new tab,
@@ -94,7 +95,12 @@ and retrieve the images.
       (classic)" in the menu that drops down.
    1. Set the expiration date to "none" (unless you want to periodically
       regenerate this key).
-   1. Check `repo` and `read:user` permissions.
+   1. Check `read:user` and `user:email` and `repo` permissions.
+      - `read:user` and `repo` permissions are necessary for reading user and
+        repository metadata to calculate statistics
+      - `user:email` permission is necessary for correctly attributing commits
+        to the user when cloning repositories locally to compute lines of code
+        changed
    1. Click the green "Generate token" button at the bottom.
    1. **Copy the token and save it somewhere.** If you lose it, you will not be
       able to access it again, and will have to regenerate a new one. I keep

@@ -1,19 +1,29 @@
 const std = @import("std");
 
+var is_installed: ?bool = null;
+
 pub fn isInstalled(gpa: std.mem.Allocator) bool {
+    if (is_installed) |v| {
+        return v;
+    }
     var arena = std.heap.ArenaAllocator.init(gpa);
     defer arena.deinit();
     const run = std.process.Child.run(.{
         .allocator = arena.allocator(),
         .argv = &.{ "git", "--version" },
-    }) catch return false;
-    return switch (run.term) {
+    }) catch {
+        is_installed = false;
+        return is_installed.?;
+    };
+    is_installed = switch (run.term) {
         .Exited => |v| v == 0,
         else => false,
     };
+    return is_installed.?;
 }
 
 pub fn currentCommit(gpa: std.mem.Allocator) ![]const u8 {
+    if (!isInstalled(gpa)) return error.GitNotInstalled;
     var arena = std.heap.ArenaAllocator.init(gpa);
     defer arena.deinit();
     const run = try std.process.Child.run(.{
@@ -25,17 +35,22 @@ pub fn currentCommit(gpa: std.mem.Allocator) ![]const u8 {
 
 pub fn getLinesChanged(
     gpa: std.mem.Allocator,
+    login: []const u8,
+    token: []const u8,
     repo: []const u8,
     emails: []const []const u8,
 ) !u32 {
+    if (!isInstalled(gpa)) return error.GitNotInstalled;
     var arena = std.heap.ArenaAllocator.init(gpa);
     defer arena.deinit();
     const allocator = arena.allocator();
 
     const repo_path = try std.mem.replaceOwned(u8, allocator, repo, "/", "_");
-    const repo_url = try std.mem.concat(allocator, u8, &.{
-        "https://github.com/", repo, ".git",
-    });
+    const repo_url = try std.fmt.allocPrint(
+        allocator,
+        "https://{s}:{s}@github.com/{s}.git",
+        .{ login, token, repo },
+    );
     const clone = try std.process.Child.run(.{
         .allocator = allocator,
         .argv = &.{
