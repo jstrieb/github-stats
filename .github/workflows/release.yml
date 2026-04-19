@@ -26,7 +26,7 @@ jobs:
 
     - name: Upload Release Artifacts
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
         TAG: ${{ github.ref_name }}
       run: |
         (

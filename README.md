@@ -114,7 +114,7 @@ and retrieve the images.
      left of the page, then click "Create a new repository."
    - Note: this is **not** the same as forking a copy because it copies
      everything fresh, without the huge commit history.
-1. Create a new repository secret named `GITHUB_TOKEN` with your personal
+1. Create a new repository secret named `ACCESS_TOKEN` with your personal
    access token from the first step.
    1. [Go to the "New secret" page for your copy of this repository by clicking
       this link.](../../settings/secrets/actions/new)
@@ -126,7 +126,7 @@ and retrieve the images.
            menu that drops down.
         1. Click the green "New repository secret" button on the "Actions
            secrets and variables" page.
-   1. Name your secret `GITHUB_TOKEN`.
+   1. Name your secret `ACCESS_TOKEN`.
    1. Paste your personal access token from step 1 into the large "Secret" text
       box.
 1. (Optional) Make other secrets for more configuration.

@@ -36,7 +36,7 @@ const embedded_overview_template = @embedFile("templates/overview.svg");
 const embedded_languages_template = @embedFile("templates/languages.svg");
 
 const Args = struct {
-    github_token: ?[]const u8 = null,
+    access_token: ?[]const u8 = null,
     json_input_file: ?[]const u8 = null,
     json_output_file: ?[]const u8 = null,
     silent: bool = false,
@@ -59,7 +59,7 @@ const Args = struct {
     pub fn init(allocator: std.mem.Allocator) !Self {
         return try argparse.parse(allocator, Self, struct {
             fn errorCheck(a: Self, stderr: *std.Io.Writer) !bool {
-                if ((a.github_token == null or a.github_token.?.len == 0) and
+                if ((a.access_token == null or a.access_token.?.len == 0) and
                     a.json_input_file == null and !a.version)
                 {
                     try stderr.print(
@@ -219,9 +219,9 @@ pub fn main() !void {
         const data = try readFile(allocator, path);
         defer allocator.free(data);
         break :stats try Statistics.initFromJson(allocator, data);
-    } else if (args.github_token) |github_token| stats: {
+    } else if (args.access_token) |access_token| stats: {
         std.log.info("Collecting statistics from GitHub API", .{});
-        var client: HttpClient = try .init(allocator, github_token);
+        var client: HttpClient = try .init(allocator, access_token);
         defer client.deinit();
         break :stats try Statistics.init(
             &client,
