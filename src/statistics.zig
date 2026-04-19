@@ -585,8 +585,11 @@ fn getLinesChanged(
             std.Thread.sleep(delay * std.time.ns_per_s);
         }
         switch (try item.repo.getLinesChanged(arena, client, self.user)) {
-            .ok, .forbidden => {},
-            .accepted => {
+            .ok => {},
+            // If we're hitting rate limits on this API, just clone the repo
+            // locally to compute lines changed
+            // https://docs.github.com/en/rest/using-the-rest-api/troubleshooting-the-rest-api?apiVersion=2026-03-10#rate-limit-errors
+            .accepted, .forbidden, .too_many_requests => {
                 item.timestamp = std.time.timestamp() + item.delay;
                 // Note: this actually works way better with a very short delay,
                 // hence no exponential backoff
