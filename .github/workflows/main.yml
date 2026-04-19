@@ -26,7 +26,7 @@ jobs:
         git config --global user.email "github-stats[bot]@jstrieb.github.io"
         # Push generated files to the generated branch
         git checkout generated || git checkout -b generated
-        git merge master
+        git merge master || true
 
     - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29  # v2 tag
       with:
@@ -38,7 +38,7 @@ jobs:
 
     - name: Generate images
       run: |
-        ./zig-out/bin/github_stats
+        ./zig-out/bin/github-stats
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         EXCLUDE_REPOS: ${{ secrets.EXCLUDE_REPOS }}
