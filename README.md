@@ -171,15 +171,23 @@ and retrieve the images.
 Using the `github-stats` CLI (available on the
 [releases](https://github.com/jstrieb/github-stats/releases/latest) page) to
 run locally, you can dump raw statistics data to a JSON file using the
-`--json-output-file` command-line argument. Then, you can import the JSON file
-into your programming language of choice and start analyzing.
+`--json-output-file` command-line argument. 
 
-My preference is to use [`jq`](https://github.com/jqlang/jq) from the command
-line. The command-line examples below assume the JSON file is stored in
+``` bash
+sudo curl --location --output '/usr/local/bin/github-stats' 'https://github.com/jstrieb/github-stats/releases/latest/download/github-stats_x86_64-linux'
+sudo chmod +x /usr/local/bin/github-stats
+github-stats --version
+
+github-stats --access-token [YOUR API KEY] --json-output-file stats.json --debug
+```
+
+Then, you can import the JSON file into your programming language of choice and
+start analyzing. My preference is to use [`jq`](https://github.com/jqlang/jq)
+from the command line. The examples below assume the JSON file is stored in
 `stats.json`.
 
 
-### List all
+### List All
 
 List all repositories, sorted with most-viewed at the bottom.
 
@@ -191,6 +199,21 @@ In that command, replace `.views` with any other field name (such as
 `.lines_changed` or `.stars`) to sort by that field instead. The command
 removes the languages field (using `del()`) because it can clutter the output,
 making it hard to read.
+
+
+### List Languages
+
+List all languages, sorted with most-used at the bottom.
+
+``` bash
+jq --raw-output '
+  [.repositories[].languages[]] 
+    | group_by(.name) 
+    | sort_by([.[].size] | add) 
+    | .[] 
+    | "\(.[0].name): \([.[].size] | add)"
+' stats.json
+```
 
 
 ## Support the Project
