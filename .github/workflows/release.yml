@@ -19,6 +19,9 @@ jobs:
     - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29  # v2 tag
       with:
         version: 0.15.2
+        # I only want to disable the build cache, but don't see a good way to do
+        # that besides disabling all of the caching
+        use-cache: false
 
     - name: Build
       run: |
