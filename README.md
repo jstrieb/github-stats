@@ -184,8 +184,13 @@ run locally, you can dump raw statistics data to a JSON file using the
 `--json-output-file` command-line argument. 
 
 ``` bash
-sudo curl --location --output '/usr/local/bin/github-stats' 'https://github.com/jstrieb/github-stats/releases/latest/download/github-stats_x86_64-linux'
+# Instructions for Linux. Change the filename at the end of the URL for macOS.
+sudo curl \
+    --location \
+    --output '/usr/local/bin/github-stats' \
+    'https://github.com/jstrieb/github-stats/releases/latest/download/github-stats_x86_64-linux'
 sudo chmod +x /usr/local/bin/github-stats
+
 github-stats --version
 
 github-stats --access-token [YOUR API KEY] --json-output-file stats.json --debug
