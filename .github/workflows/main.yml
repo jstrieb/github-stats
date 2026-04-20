@@ -20,14 +20,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v6
-    - name: Checkout history branch
-      run: |
-        git config --global user.name "jstrieb/github-stats"
-        git config --global user.email "github-stats[bot]@jstrieb.github.io"
-        # Push generated files to the generated branch
-        git pull
-        git checkout generated || git checkout -b generated
-        git merge master || true
 
     - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29  # v2 tag
       with:
@@ -36,6 +28,14 @@ jobs:
     - name: Build
       run: |
         zig build --release
+
+    - name: Checkout history branch
+      run: |
+        git config --global user.name "jstrieb/github-stats"
+        git config --global user.email "github-stats[bot]@jstrieb.github.io"
+        # Push generated files to the generated branch
+        git pull
+        git checkout generated || git checkout -b generated
 
     - name: Generate images
       run: |
