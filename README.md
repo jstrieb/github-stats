@@ -47,27 +47,30 @@ would be unable to access.
 
 The GitHub statistics API returns inaccurate results in some situations:
 
+- Total lines of code modified may be too high or too low
+  - GitHub counts changes to files like `package-lock.json` that may inflate the
+    line count in surprising ways
+  - On the other hand, GitHub refuses to count lines of code for repositories
+    with more than 10,000 commits, so contributions to those will not be
+    reflected in the data at all
+  - [The GitHub API endpoint for computing contributor statistics no longer
+    works reliably](https://github.com/orgs/community/discussions/192970), so we
+    fall back on computing the statistics ourselves by cloning each repository
+    locally and tallying lines changed with the `git` CLI
+    - Our computed totals likely under-count relative to GitHub's, since theirs
+      correctly attribute authorship for contributions to pull requests with
+      several authors that end up squashed and merged by just one author
+    - They also correctly attribute commits we may miss if they are made with
+      old email addresses no longer connected to the account
 - Repository view count statistics often seem too low, and many referring sites
   are not captured
   - If you lack permissions to access the view count for a repository, it will
     be tallied as zero views – this is common for external repositories where
     your only contribution is making a pull request
-- Total lines of code modified may be inflated – GitHub counts changes to files like
-  `package-lock.json` that may impact the line count in surprising ways
-  - On the other hand, GitHub refuses to count lines of code for repositories
-    with more than 10,000 commits, so contributions to those will not be
-    reflected in the data at all
 - Only repositories with commit contributions are counted, so if you only open
   an issue on a repo, it will not show up in the statistics
   - Repos you created and own may not be counted if you never commit to them, or
     if the committer email is not connected to your GitHub account
-- [The GitHub API endpoint for computing contributor statistics no longer works
-  reliably](https://github.com/orgs/community/discussions/192970), so we compute
-  the statistics ourselves by cloning each repository locally and tallying lines
-  changed with the `git` CLI
-  - Our computed totals likely under-count relative to GitHub's, since theirs
-    correctly attribute authorship for contributions to pull requests with
-    several authors that end up squashed and merged by just one author
 
 If the calculated numbers seem strange, run the CLI locally and dump JSON output
 to determine which repositories are skewing the statistics in unexpected ways.
@@ -84,8 +87,8 @@ and retrieve the images.
    and `repo`
    permissions.](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
    1. [Navigate to the personal access tokens (classic)
-      page.](https://github.com/settings/tokens) Open that link in a new tab,
-      or proceed with the steps below.
+      page.](https://github.com/settings/tokens) Open that link in a new tab, or
+      proceed with the steps below.
       1. Click your avatar in the top right corner, then "Settings" on the menu
          that drops down.
       1. Click "Developer settings" from the menu on the left.
@@ -105,8 +108,8 @@ and retrieve the images.
    1. **Copy the token and save it somewhere.** If you lose it, you will not be
       able to access it again, and will have to regenerate a new one. I keep
       mine saved along with the GitHub entry in my password manager.
-   1. Some users report that it can take some time for the personal access
-      token to take effect. For more information, see
+   1. Some users report that it can take some time for the personal access token
+      to take effect. For more information, see
       [#30](https://github.com/jstrieb/github-stats/issues/30).
 1. Create a copy of this repository by clicking
    [here](https://github.com/jstrieb/github-stats/generate).
@@ -114,8 +117,8 @@ and retrieve the images.
      left of the page, then click "Create a new repository."
    - Note: this is **not** the same as forking a copy because it copies
      everything fresh, without the huge commit history.
-1. Create a new repository secret named `ACCESS_TOKEN` with your personal
-   access token from the first step.
+1. Create a new repository secret named `ACCESS_TOKEN` with your personal access
+   token from the first step.
    1. [Go to the "New secret" page for your copy of this repository by clicking
       this link.](../../settings/secrets/actions/new)
       - If the link doesn't work, try clicking it from your copy of this
@@ -132,10 +135,17 @@ and retrieve the images.
 1. (Optional) Make other secrets for more configuration.
    - To exclude some repositories from the aggregate statistics, add them
      (separated by commas) to a secret called `EXCLUDE_REPOS`.
+     - To prevent your copy of this repository from showing up in your
+       statistics, add the name of your copy of the repo to this list.
    - To exclude some languages from the aggregate statistics, add them
      (separated by commas) to a secret called `EXCLUDE_LANGS`.
+     - The languages are case insensitive, and can include spaces.
+     - Language names can be found either in a [local stats file generated by
+       the CLI](#list-languages), or in the [list used by GitHub
+       linguist](https://github.com/github-linguist/linguist/blob/537297cdae3ab05f8d5dd1c03627a5bd73707b19/lib/linguist/languages.yml)
+       (which powers their language analysis on the back end).
    - Lists for `EXCLUDE_REPOS` and `EXCLUDE_LANGS` can use globbing patterns.
-     For example, to exclude all repos by "@jstrieb", add `jstrieb/*` to
+     For example, to exclude all repos by user "jstrieb", add `jstrieb/*` to
      `EXCLUDE_REPOS`.
    - These can also be set directly in [the Actions
      workflow](.github/workflows/main.yml), but you should set them as secrets
@@ -171,15 +181,28 @@ and retrieve the images.
 Using the `github-stats` CLI (available on the
 [releases](https://github.com/jstrieb/github-stats/releases/latest) page) to
 run locally, you can dump raw statistics data to a JSON file using the
-`--json-output-file` command-line argument. Then, you can import the JSON file
-into your programming language of choice and start analyzing.
+`--json-output-file` command-line argument. 
 
-My preference is to use [`jq`](https://github.com/jqlang/jq) from the command
-line. The command-line examples below assume the JSON file is stored in
+``` bash
+# Instructions for Linux. Change the filename at the end of the URL for macOS.
+sudo curl \
+    --location \
+    --output '/usr/local/bin/github-stats' \
+    'https://github.com/jstrieb/github-stats/releases/latest/download/github-stats_x86_64-linux'
+sudo chmod +x /usr/local/bin/github-stats
+
+github-stats --version
+
+github-stats --access-token [YOUR API KEY] --json-output-file stats.json --debug
+```
+
+Then, you can import the JSON file into your programming language of choice and
+start analyzing. My preference is to use [`jq`](https://github.com/jqlang/jq)
+from the command line. The examples below assume the JSON file is stored in
 `stats.json`.
 
 
-### List all
+### List All
 
 List all repositories, sorted with most-viewed at the bottom.
 
@@ -191,6 +214,21 @@ In that command, replace `.views` with any other field name (such as
 `.lines_changed` or `.stars`) to sort by that field instead. The command
 removes the languages field (using `del()`) because it can clutter the output,
 making it hard to read.
+
+
+### List Languages
+
+List all languages, sorted with most-used at the bottom.
+
+``` bash
+jq --raw-output '
+  [.repositories[].languages[]] 
+    | group_by(.name) 
+    | sort_by([.[].size] | add) 
+    | .[] 
+    | "\(.[0].name): \([.[].size] | add)"
+' stats.json
+```
 
 
 ## Support the Project

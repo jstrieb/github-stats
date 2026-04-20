@@ -63,7 +63,7 @@ const Args = struct {
                     a.json_input_file == null and !a.version)
                 {
                     try stderr.print(
-                        "You must pass either an input file or an GitHub token.\n",
+                        "You must pass an input file or a GitHub token.\n",
                         .{},
                     );
                     return false;

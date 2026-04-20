@@ -64,7 +64,8 @@ pub fn build(b: *std.Build) !void {
         .{ .cpu_arch = .powerpc64, .os_tag = .linux },
         .{ .cpu_arch = .powerpc64le, .os_tag = .freebsd },
         .{ .cpu_arch = .powerpc64le, .os_tag = .linux },
-        .{ .cpu_arch = .riscv32, .os_tag = .linux },
+        // Fails with errors (haven't investigated)
+        // .{ .cpu_arch = .riscv32, .os_tag = .linux },
         .{ .cpu_arch = .riscv64, .os_tag = .freebsd },
         .{ .cpu_arch = .riscv64, .os_tag = .linux },
         .{ .cpu_arch = .thumb, .os_tag = .windows },
