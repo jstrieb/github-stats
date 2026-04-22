@@ -44,10 +44,11 @@ would be unable to access.
 
 
 ## Disclaimer
+<details>
 
-The GitHub statistics API returns inaccurate results in some situations:
+<summary>The GitHub statistics API returns inaccurate results in some situations</summary>
 
-- Total lines of code modified may be too high or too low
+Total lines of code modified may be too high or too low
   - GitHub counts changes to files like `package-lock.json` that may inflate the
     line count in surprising ways
   - On the other hand, GitHub refuses to count lines of code for repositories
@@ -62,15 +63,27 @@ The GitHub statistics API returns inaccurate results in some situations:
       several authors that end up squashed and merged by just one author
     - They also correctly attribute commits we may miss if they are made with
       old email addresses no longer connected to the account
-- Repository view count statistics often seem too low, and many referring sites
-  are not captured
-  - If you lack permissions to access the view count for a repository, it will
+</details>
+
+<details>
+
+<summary>Repository view count statistics often seem too low, and many referring sites
+  are not captured</summary>
+
+If you lack permissions to access the view count for a repository, it will
     be tallied as zero views – this is common for external repositories where
     your only contribution is making a pull request
-- Only repositories with commit contributions are counted, so if you only open
-  an issue on a repo, it will not show up in the statistics
-  - Repos you created and own may not be counted if you never commit to them, or
+</details>
+
+<details>
+
+<summary>Only repositories with commit contributions are counted, so if you only open
+  an issue on a repo, it will not show up in the statistics</summary>
+
+Repos you created and own may not be counted if you never commit to them, or
     if the committer email is not connected to your GitHub account
+</details>
+
 
 If the calculated numbers seem strange, run the CLI locally and dump JSON output
 to determine which repositories are skewing the statistics in unexpected ways.
