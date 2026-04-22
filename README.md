@@ -3,6 +3,12 @@
 <!--
 https://github.community/t/support-theme-context-for-images-in-light-vs-dark-mode/147981/84
 -->
+Generate visualizations of GitHub user and repository statistics with GitHub
+Actions. Visualizations can include data from private repositories, and from
+repositories you have contributed to, but do not own.
+
+Generated images automatically switch between GitHub light theme and GitHub
+dark theme.
 
 <div align="center">
 <a href="https://github.com/jstrieb/github-stats">
@@ -12,14 +18,6 @@ https://github.community/t/support-theme-context-for-images-in-light-vs-dark-mod
 <img src="https://github.com/jstrieb/github-stats/blob/generated/languages.svg#gh-light-mode-only" />
 </a>
 </div>
-
-Generate visualizations of GitHub user and repository statistics with GitHub
-Actions. Visualizations can include data from private repositories, and from
-repositories you have contributed to, but do not own.
-
-Generated images automatically switch between GitHub light theme and GitHub
-dark theme.
-
 
 ## Background
 
@@ -44,10 +42,11 @@ would be unable to access.
 
 
 ## Disclaimer
+<details>
 
-The GitHub statistics API returns inaccurate results in some situations:
+<summary>The GitHub statistics API returns inaccurate results in some situations</summary>
 
-- Total lines of code modified may be too high or too low
+Total lines of code modified may be too high or too low
   - GitHub counts changes to files like `package-lock.json` that may inflate the
     line count in surprising ways
   - On the other hand, GitHub refuses to count lines of code for repositories
@@ -62,15 +61,27 @@ The GitHub statistics API returns inaccurate results in some situations:
       several authors that end up squashed and merged by just one author
     - They also correctly attribute commits we may miss if they are made with
       old email addresses no longer connected to the account
-- Repository view count statistics often seem too low, and many referring sites
-  are not captured
-  - If you lack permissions to access the view count for a repository, it will
+</details>
+
+<details>
+
+<summary>Repository view count statistics often seem too low, and many referring sites
+  are not captured</summary>
+
+If you lack permissions to access the view count for a repository, it will
     be tallied as zero views – this is common for external repositories where
     your only contribution is making a pull request
-- Only repositories with commit contributions are counted, so if you only open
-  an issue on a repo, it will not show up in the statistics
-  - Repos you created and own may not be counted if you never commit to them, or
+</details>
+
+<details>
+
+<summary>Only repositories with commit contributions are counted, so if you only open
+  an issue on a repo, it will not show up in the statistics</summary>
+
+Repos you created and own may not be counted if you never commit to them, or
     if the committer email is not connected to your GitHub account
+</details>
+
 
 If the calculated numbers seem strange, run the CLI locally and dump JSON output
 to determine which repositories are skewing the statistics in unexpected ways.
@@ -79,102 +90,231 @@ See [below](#analyzing-the-data) for tips.
 
 ## Installation
 
-To make your own statistics images: make a copy of this repository, make a
+There are 3 ways to choose. No matter which way, you need to set the `ACCESS_TOKEN`.
+
+
+<details>
+<summary><strong>If you don’t want to have extra code to generate images in your 
+warehouse, and there is no need to build with the latest code on the master branch.
+</strong></summary>
+You can use the following code in your repository to run automatically. It will
+  download the latest precompiled version of github-stats to generate images.
+
+
+```yml
+name: Generate Stats Images By Download
+
+on:
+  push:
+    branches: 
+      - master
+  schedule:
+    - cron: "5 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash -euxo pipefail {0}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Downloads latest github-stats
+      run: |
+        mkdir -p zig-out/bin
+        curl --location --output 'zig-out/bin/github-stats' 'https://github.com/jstrieb/github-stats/releases/latest/download/github-stats_x86_64-linux'
+        sudo chmod +x zig-out/bin/github-stats
+
+    - name: Checkout history branch
+      run: |
+        git config --global user.name "jstrieb/github-stats"
+        git config --global user.email "github-stats[bot]@jstrieb.github.io"
+        # Push generated files to the generated branch
+        git pull
+        git checkout generated || git checkout -b generated
+
+    - name: Generate images
+      run: |
+        ./zig-out/bin/github-stats
+      env:
+        ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+        EXCLUDE_REPOS: ${{ secrets.EXCLUDE_REPOS }}
+        EXCLUDE_LANGS: ${{ secrets.EXCLUDE_LANGS }}
+        EXCLUDE_PRIVATE: "false"
+        DEBUG: "false"
+        # TODO: Remove this when they get their API working again
+        # https://github.com/orgs/community/discussions/192970
+        MAX_RETRIES: 5
+
+    - name: Commit to the repo
+      run: |
+        git add .
+        # Force the build to succeed, even if no files were changed
+        git commit -m 'Update generated files' || true
+        git push --set-upstream origin generated
+```
+</details>
+
+<details>
+<summary><strong>You don’t want to add build code to your repository, but you
+  want to use the latest code to generate images.
+</strong></summary>
+You can use the following code in your repository to run automatically. 
+  It will clone the latest code from the master branch to build github-stats
+  and generate images.
+
+
+```yml
+name: Generate Stats Images By Clone And Build
+
+on:
+  push:
+    branches:
+      - master
+  schedule:
+    - cron: "5 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash -euxo pipefail {0}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29
+        with:
+          version: 0.15.2
+
+      - name: Clone and build github-stats
+        run: |
+          git clone --depth=1 --branch master https://github.com/jstrieb/github-stats.git
+          cd github-stats
+          zig build --release
+          cp zig-out/bin/github-stats ../github-stats-bin
+
+      - name: Checkout history branch
+        run: |
+          git config --global user.name "jstrieb/github-stats"
+          git config --global user.email "github-stats[bot]@jstrieb.github.io"
+          git fetch origin generated:generated || true
+          git checkout generated || git checkout --orphan generated
+
+      - name: Generate images
+        run: |
+          ./github-stats-bin
+        env:
+          ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          EXCLUDE_REPOS: ${{ secrets.EXCLUDE_REPOS }}
+          EXCLUDE_LANGS: ${{ secrets.EXCLUDE_LANGS }}
+          EXCLUDE_PRIVATE: "false"
+          DEBUG: "false"
+          MAX_RETRIES: "5"
+
+      - name: Commit to the repo
+        run: |
+          git add .
+          git commit -m 'Update generated files' || true
+          git push --set-upstream origin generated
+```
+</details>
+
+<details open>
+<summary><strong>To make your own statistics images: make a copy of this repository, make a
 GitHub API token, add the token to the repository, run the Actions workflow,
-and retrieve the images.
+and retrieve the images.</strong></summary>
 
-1. [Make a "**classic**" personal access token with `read:user`, `user:email`,
-   and `repo`
-   permissions.](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
-   1. [Navigate to the personal access tokens (classic)
-      page.](https://github.com/settings/tokens) Open that link in a new tab, or
-      proceed with the steps below.
-      1. Click your avatar in the top right corner, then "Settings" on the menu
-         that drops down.
-      1. Click "Developer settings" from the menu on the left.
-      1. Click "Personal access tokens", then "Tokens (classic)" from the menu
-         on the left.
-   1. Click "Generate new token" in the top right, then "Generate new token
-      (classic)" in the menu that drops down.
-   1. Set the expiration date to "none" (unless you want to periodically
-      regenerate this token).
-   1. Check `read:user`, `user:email`, and `repo` permissions.
-      - `read:user` and `repo` permissions are necessary for reading user and
-        repository metadata to calculate statistics.
-      - `user:email` permission is necessary for correctly attributing commits
-        to the user when cloning repositories locally to compute lines of code
-        changed.
-   1. Click the green "Generate token" button at the bottom.
-   1. **Copy the token and save it somewhere.** If you lose it, you will not be
-      able to access it again, and will have to regenerate a new one. I keep
-      mine saved along with the GitHub entry in my password manager.
-   1. Some users report that it can take some time for the personal access token
-      to take effect. For more information, see
-      [#30](https://github.com/jstrieb/github-stats/issues/30).
-1. Create a copy of this repository by clicking
-   [here](https://github.com/jstrieb/github-stats/generate).
-   - Equivalently, click the big, green "Use this template" button at the top
-     left of the page, then click "Create a new repository."
-   - Note: this is **not** the same as forking a copy because it copies
-     everything fresh, without the huge commit history.
-1. Create a new repository secret named `ACCESS_TOKEN` with your personal access
-   token from the first step.
-   1. [Go to the "New secret" page for your copy of this repository by clicking
-      this link.](../../settings/secrets/actions/new)
-      - If the link doesn't work, try clicking it from your copy of this
-        repository.
-      - Alternatively, go to the page manually.
-        1. Click "Settings" for your copy of this repository.
-        1. Click "Secrets and variables" on the left, then "Actions" from the
-           menu that drops down.
-        1. Click the green "New repository secret" button on the "Actions
-           secrets and variables" page.
-   1. Name your secret `ACCESS_TOKEN`.
-   1. Paste your personal access token from step 1 into the large "Secret" text
-      box.
-1. (Optional) Make other secrets for more configuration.
-   - To exclude some repositories from the aggregate statistics, add them
-     (separated by commas) to a secret called `EXCLUDE_REPOS`.
-     - To prevent your copy of this repository from showing up in your
-       statistics, add the name of your copy of the repo to this list.
-   - To exclude some languages from the aggregate statistics, add them
-     (separated by commas) to a secret called `EXCLUDE_LANGS`.
-     - The languages are case insensitive, and can include spaces.
-     - Language names can be found either in a [local stats file generated by
-       the CLI](#list-languages), or in the [list used by GitHub
-       linguist](https://github.com/github-linguist/linguist/blob/537297cdae3ab05f8d5dd1c03627a5bd73707b19/lib/linguist/languages.yml)
-       (which powers their language analysis on the back end).
-   - Lists for `EXCLUDE_REPOS` and `EXCLUDE_LANGS` can use globbing patterns.
-     For example, to exclude all repos by user "jstrieb", add `jstrieb/*` to
-     `EXCLUDE_REPOS`.
-   - These can also be set directly in [the Actions
-     workflow](.github/workflows/main.yml), but you should set them as secrets
-     if you want to keep the repository names or languages private.
-   - Other configuration options can be set as environment variables or command
-     line arguments by directly editing [the Actions
-     workflow](.github/workflows/main.yml).
-1. Go to the [Actions
-   page](../../actions?query=workflow%3A"Generate+Stats+Images") and click "Run
-   Workflow" on the right side of the screen to generate images for the first
-   time.
-   - They automatically regenerate every 24 hours, but they can be manually
-     regenerated by running the workflow this way.
-1. Take a look at the images that have been created on the [`generated`
-   branch](tree/generated/).
-   - The [`overview.svg`](tree/generated/overview.svg) file.
-   - The [`languages.svg`](tree/generated/languages.svg) file.
-1. To add the statistics to your GitHub profile README, copy and paste the
-   following lines of code into your markdown content.
-   - Replace `[USERNAME]` in the links below with your own username.
-   ``` markdown
-   ![](https://github.com/[USERNAME]/github-stats/blob/generated/overview.svg#gh-dark-mode-only)
-   ![](https://github.com/[USERNAME]/github-stats/blob/generated/overview.svg#gh-light-mode-only)
-   ![](https://github.com/[USERNAME]/github-stats/blob/generated/languages.svg#gh-dark-mode-only)
-   ![](https://github.com/[USERNAME]/github-stats/blob/generated/languages.svg#gh-light-mode-only)
-   [Created by `jstrieb/github-stats`.](https://github.com/jstrieb/github-stats)
-   ```
-1. Star this repo if you like it!
+##### 1. Create a Personal Access Token
+First, create a **classic** GitHub personal access token.
+Go to:
+- https://github.com/settings/tokens
+Then:
+1. Click **Generate new token**
+2. Select **Generate new token (classic)**
+3. Set the expiration to **No expiration**
+4. Enable these permissions:
+   - read:user
+   - user:email
+   - repo
 
+#### Why these permissions are needed
+
+- read:user and repo are used to read user and repository metadata
+- user:email is used to correctly match commits
+
+> Save your token somewhere safe. You will not be able to see it again.
+
+##### 2. Create Your Own Copy of This Repository
+
+Use this template:
+
+- https://github.com/jstrieb/github-stats/generate
+
+Or:
+
+1. Click "Use this template"
+2. Create a new repository
+
+##### 3. Add the Token as a Repository Secret
+Go to:
+Settings → Secrets and variables → Actions → New repository secret
+Create:
+Name: `ACCESS_TOKEN` 
+Value: your token
+
+
+##### 4. Optional Configuration
+
+- Exclude repositories
+Create secret: `EXCLUDE_REPOS`  
+Example: repo1,repo2,user/*
+
+- Exclude languages
+Create secret:`EXCLUDE_LANGS`  
+Example: Html,CSS
+
+##### 5. Run the Workflow
+Go to:
+Actions → Generate Stats Images
+Click:
+Run workflow
+
+##### 6. Find Generated Images
+Check branch: generated  
+Files:  
+- overview.svg
+- languages.svg
+
+##### 7. Add to README
+
+Replace [USERNAME]:
+
+```md
+![](https://github.com/[USERNAME]/github-stats/blob/generated/overview.svg#gh-dark-mode-only)
+![](https://github.com/[USERNAME]/github-stats/blob/generated/overview.svg#gh-light-mode-only)
+![](https://github.com/[USERNAME]/github-stats/blob/generated/languages.svg#gh-dark-mode-only)
+![](https://github.com/[USERNAME]/github-stats/blob/generated/languages.svg#gh-light-mode-only)
+```
+
+</details>
+
+
+<details>
+  <summary><h2>Analyzing the Data</h2></summary>
 
 ## Analyzing the Data
 
@@ -183,7 +323,7 @@ Using the `github-stats` CLI (available on the
 run locally, you can dump raw statistics data to a JSON file using the
 `--json-output-file` command-line argument. 
 
-``` bash
+```bash
 # Instructions for Linux. Change the filename at the end of the URL for macOS.
 sudo curl \
     --location \
@@ -201,12 +341,11 @@ start analyzing. My preference is to use [`jq`](https://github.com/jqlang/jq)
 from the command line. The examples below assume the JSON file is stored in
 `stats.json`.
 
-
 ### List All
 
 List all repositories, sorted with most-viewed at the bottom.
 
-``` bash
+```bash
 jq '.repositories | sort_by(.views) | del(.[].languages)' stats.json
 ```
 
@@ -215,12 +354,11 @@ In that command, replace `.views` with any other field name (such as
 removes the languages field (using `del()`) because it can clutter the output,
 making it hard to read.
 
-
 ### List Languages
 
 List all languages, sorted with most-used at the bottom.
 
-``` bash
+```bash
 jq --raw-output '
   [.repositories[].languages[]] 
     | group_by(.name) 
@@ -229,6 +367,8 @@ jq --raw-output '
     | "\(.[0].name): \([.[].size] | add)"
 ' stats.json
 ```
+
+</details>
 
 
 ## Support the Project
