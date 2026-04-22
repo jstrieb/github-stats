@@ -3,6 +3,12 @@
 <!--
 https://github.community/t/support-theme-context-for-images-in-light-vs-dark-mode/147981/84
 -->
+Generate visualizations of GitHub user and repository statistics with GitHub
+Actions. Visualizations can include data from private repositories, and from
+repositories you have contributed to, but do not own.
+
+Generated images automatically switch between GitHub light theme and GitHub
+dark theme.
 
 <div align="center">
 <a href="https://github.com/jstrieb/github-stats">
@@ -12,14 +18,6 @@ https://github.community/t/support-theme-context-for-images-in-light-vs-dark-mod
 <img src="https://github.com/jstrieb/github-stats/blob/generated/languages.svg#gh-light-mode-only" />
 </a>
 </div>
-
-Generate visualizations of GitHub user and repository statistics with GitHub
-Actions. Visualizations can include data from private repositories, and from
-repositories you have contributed to, but do not own.
-
-Generated images automatically switch between GitHub light theme and GitHub
-dark theme.
-
 
 ## Background
 
