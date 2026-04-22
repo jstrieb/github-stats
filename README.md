@@ -90,7 +90,148 @@ See [below](#analyzing-the-data) for tips.
 
 ## Installation
 
+There are 3 ways to choose. No matter which way, you need to set the `ACCESS_TOKEN`.
 
+
+<details>
+<summary><strong>If you don’t want to have extra code to generate images in your 
+warehouse, and there is no need to build with the latest code on the master branch.
+</strong></summary>
+You can use the following code in your repository to run automatically. It will
+  download the latest precompiled version of github-stats to generate images.
+
+
+```yml
+name: Generate Stats Images By Download
+
+on:
+  push:
+    branches: 
+      - master
+  schedule:
+    - cron: "5 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash -euxo pipefail {0}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Downloads latest github-stats
+      run: |
+        mkdir -p zig-out/bin
+        curl --location --output 'zig-out/bin/github-stats' 'https://github.com/jstrieb/github-stats/releases/latest/download/github-stats_x86_64-linux'
+        sudo chmod +x zig-out/bin/github-stats
+
+    - name: Checkout history branch
+      run: |
+        git config --global user.name "jstrieb/github-stats"
+        git config --global user.email "github-stats[bot]@jstrieb.github.io"
+        # Push generated files to the generated branch
+        git pull
+        git checkout generated || git checkout -b generated
+
+    - name: Generate images
+      run: |
+        ./zig-out/bin/github-stats
+      env:
+        ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+        EXCLUDE_REPOS: ${{ secrets.EXCLUDE_REPOS }}
+        EXCLUDE_LANGS: ${{ secrets.EXCLUDE_LANGS }}
+        EXCLUDE_PRIVATE: "false"
+        DEBUG: "false"
+        # TODO: Remove this when they get their API working again
+        # https://github.com/orgs/community/discussions/192970
+        MAX_RETRIES: 5
+
+    - name: Commit to the repo
+      run: |
+        git add .
+        # Force the build to succeed, even if no files were changed
+        git commit -m 'Update generated files' || true
+        git push --set-upstream origin generated
+```
+</details>
+
+<details>
+<summary><strong>You don’t want to add build code to your repository, but you
+  want to use the latest code to generate images.
+</strong></summary>
+You can use the following code in your repository to run automatically. 
+  It will clone the latest code from the master branch to build github-stats
+  and generate images.
+
+
+```yml
+name: Generate Stats Images By Clone And Build
+
+on:
+  push:
+    branches:
+      - master
+  schedule:
+    - cron: "5 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash -euxo pipefail {0}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29
+        with:
+          version: 0.15.2
+
+      - name: Clone and build github-stats
+        run: |
+          git clone --depth=1 --branch master https://github.com/jstrieb/github-stats.git
+          cd github-stats
+          zig build --release
+          cp zig-out/bin/github-stats ../github-stats-bin
+
+      - name: Checkout history branch
+        run: |
+          git config --global user.name "jstrieb/github-stats"
+          git config --global user.email "github-stats[bot]@jstrieb.github.io"
+          git fetch origin generated:generated || true
+          git checkout generated || git checkout --orphan generated
+
+      - name: Generate images
+        run: |
+          ./github-stats-bin
+        env:
+          ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          EXCLUDE_REPOS: ${{ secrets.EXCLUDE_REPOS }}
+          EXCLUDE_LANGS: ${{ secrets.EXCLUDE_LANGS }}
+          EXCLUDE_PRIVATE: "false"
+          DEBUG: "false"
+          MAX_RETRIES: "5"
+
+      - name: Commit to the repo
+        run: |
+          git add .
+          git commit -m 'Update generated files' || true
+          git push --set-upstream origin generated
+```
+</details>
 
 <details open>
 <summary><strong>To make your own statistics images: make a copy of this repository, make a
