@@ -313,6 +313,9 @@ Replace [USERNAME]:
 </details>
 
 
+<details>
+  <summary><h2>Analyzing the Data</h2></summary>
+
 ## Analyzing the Data
 
 Using the `github-stats` CLI (available on the
@@ -320,7 +323,7 @@ Using the `github-stats` CLI (available on the
 run locally, you can dump raw statistics data to a JSON file using the
 `--json-output-file` command-line argument. 
 
-``` bash
+```bash
 # Instructions for Linux. Change the filename at the end of the URL for macOS.
 sudo curl \
     --location \
@@ -338,12 +341,11 @@ start analyzing. My preference is to use [`jq`](https://github.com/jqlang/jq)
 from the command line. The examples below assume the JSON file is stored in
 `stats.json`.
 
-
 ### List All
 
 List all repositories, sorted with most-viewed at the bottom.
 
-``` bash
+```bash
 jq '.repositories | sort_by(.views) | del(.[].languages)' stats.json
 ```
 
@@ -352,12 +354,11 @@ In that command, replace `.views` with any other field name (such as
 removes the languages field (using `del()`) because it can clutter the output,
 making it hard to read.
 
-
 ### List Languages
 
 List all languages, sorted with most-used at the bottom.
 
-``` bash
+```bash
 jq --raw-output '
   [.repositories[].languages[]] 
     | group_by(.name) 
@@ -366,6 +367,8 @@ jq --raw-output '
     | "\(.[0].name): \([.[].size] | add)"
 ' stats.json
 ```
+
+</details>
 
 
 ## Support the Project
