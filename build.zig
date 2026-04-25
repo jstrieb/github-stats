@@ -7,11 +7,11 @@ pub fn build(b: *std.Build) !void {
         .preferred_optimize_mode = .ReleaseSafe,
     });
     var version: []const u8 = @import("build.zig.zon").version;
-    if (git.isInstalled(b.allocator)) {
+    if (git.isInstalled(b.allocator, b.graph.io)) {
         version = try std.fmt.allocPrint(
             b.allocator,
             "{s} ({s})",
-            .{ version, try git.currentCommit(b.allocator) },
+            .{ version, try git.currentCommit(b.allocator, b.graph.io) },
         );
     }
     const options = b.addOptions();

@@ -2,32 +2,30 @@ const std = @import("std");
 
 var is_installed: ?bool = null;
 
-pub fn isInstalled(gpa: std.mem.Allocator) bool {
+pub fn isInstalled(gpa: std.mem.Allocator, io: std.Io) bool {
     if (is_installed) |v| {
         return v;
     }
     var arena = std.heap.ArenaAllocator.init(gpa);
     defer arena.deinit();
-    const run = std.process.Child.run(.{
-        .allocator = arena.allocator(),
+    const run = std.process.run(arena.allocator(), io, .{
         .argv = &.{ "git", "--version" },
     }) catch {
         is_installed = false;
         return is_installed.?;
     };
     is_installed = switch (run.term) {
-        .Exited => |v| v == 0,
+        .exited => |v| v == 0,
         else => false,
     };
     return is_installed.?;
 }
 
-pub fn currentCommit(gpa: std.mem.Allocator) ![]const u8 {
-    if (!isInstalled(gpa)) return error.GitNotInstalled;
+pub fn currentCommit(gpa: std.mem.Allocator, io: std.Io) ![]const u8 {
+    if (!isInstalled(gpa, io)) return error.GitNotInstalled;
     var arena = std.heap.ArenaAllocator.init(gpa);
     defer arena.deinit();
-    const run = try std.process.Child.run(.{
-        .allocator = arena.allocator(),
+    const run = try std.process.run(arena.allocator(), io, .{
         .argv = &.{ "git", "rev-parse", "HEAD" },
     });
     return try gpa.dupe(u8, run.stdout[0..8]);
@@ -35,12 +33,13 @@ pub fn currentCommit(gpa: std.mem.Allocator) ![]const u8 {
 
 pub fn getLinesChanged(
     gpa: std.mem.Allocator,
+    io: std.Io,
     login: []const u8,
     token: []const u8,
     repo: []const u8,
     emails: []const []const u8,
 ) !u32 {
-    if (!isInstalled(gpa)) return error.GitNotInstalled;
+    if (!isInstalled(gpa, io)) return error.GitNotInstalled;
     var arena = std.heap.ArenaAllocator.init(gpa);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -51,8 +50,7 @@ pub fn getLinesChanged(
         "https://{s}:{s}@github.com/{s}.git",
         .{ login, token, repo },
     );
-    const clone = try std.process.Child.run(.{
-        .allocator = allocator,
+    const clone = try std.process.run(allocator, io, .{
         .argv = &.{
             "git",
             "clone",
@@ -65,10 +63,10 @@ pub fn getLinesChanged(
         },
     });
     switch (clone.term) {
-        .Exited => |v| if (v != 0) return error.CloneFailed,
+        .exited => |v| if (v != 0) return error.CloneFailed,
         else => return error.CloneFailed,
     }
-    defer std.fs.cwd().deleteTree(repo_path) catch {};
+    defer std.Io.Dir.cwd().deleteTree(io, repo_path) catch {};
 
     const email_args = try allocator.alloc([]const u8, emails.len * 2);
     for (emails, 0..) |email, i| {
@@ -86,13 +84,9 @@ pub fn getLinesChanged(
         },
         email_args,
     });
-    const log = try std.process.Child.run(.{
-        .allocator = allocator,
-        .argv = log_args,
-        .max_output_bytes = 64 * 1024 * 1024,
-    });
+    const log = try std.process.run(allocator, io, .{ .argv = log_args });
     switch (log.term) {
-        .Exited => |v| if (v != 0) return error.LogFailed,
+        .exited => |v| if (v != 0) return error.LogFailed,
         else => return error.LogFailed,
     }
 

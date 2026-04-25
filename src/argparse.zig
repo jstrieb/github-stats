@@ -6,18 +6,22 @@ var stdout: *std.Io.Writer = undefined;
 var stderr: *std.Io.Writer = undefined;
 
 pub fn parse(
-    allocator: std.mem.Allocator,
+    init: std.process.Init,
     T: type,
     errorCheck: ?fn (args: T, stderr: *std.Io.Writer) anyerror!bool,
 ) !T {
-    var stdout_writer = std.fs.File.stdout().writer(&.{});
+    const allocator = init.gpa;
+    const io = init.io;
+
+    var stdout_writer = std.Io.File.stdout().writer(io, &.{});
     stdout = &stdout_writer.interface;
-    var stderr_writer = std.fs.File.stderr().writer(&.{});
+    var stderr_writer = std.Io.File.stderr().writer(io, &.{});
     stderr = &stderr_writer.interface;
 
     var arena: std.heap.ArenaAllocator = .init(allocator);
     defer arena.deinit();
     const a = arena.allocator();
+    const args = try init.minimal.args.toSlice(a);
 
     const fields = @typeInfo(T).@"struct".fields;
     var seen = [_]bool{false} ** fields.len;
@@ -30,10 +34,8 @@ pub fn parse(
         }
     }
 
-    const args = try std.process.argsAlloc(a);
-    defer std.process.argsFree(a, args);
     try setFromCli(T, allocator, &arena, args, &seen, &result);
-    try setFromEnv(T, allocator, &arena, &seen, &result);
+    try setFromEnv(T, allocator, &arena, &seen, &result, init.environ_map);
     try setFromDefaults(T, allocator, &seen, &result);
 
     inline for (fields, seen) |field, seen_field| {
@@ -139,10 +141,9 @@ fn setFromEnv(
     arena: *std.heap.ArenaAllocator,
     seen: []bool,
     result: *T,
+    env: *std.process.Environ.Map,
 ) !void {
     const a = arena.allocator();
-    var env = try std.process.getEnvMap(a);
-    defer env.deinit();
     var iterator = env.iterator();
     while (iterator.next()) |entry| {
         const key = try a.dupe(u8, entry.key_ptr.*);

@@ -106,6 +106,7 @@ const Language = struct {
 pub fn init(
     client: *HttpClient,
     allocator: std.mem.Allocator,
+    io: std.Io,
     max_retries: ?usize,
 ) !Statistics {
     var arena = std.heap.ArenaAllocator.init(allocator);
@@ -113,7 +114,7 @@ pub fn init(
 
     var self: Statistics = try getRepos(allocator, &arena, client);
     errdefer self.deinit(allocator);
-    try self.getLinesChanged(&arena, client, max_retries);
+    try self.getLinesChanged(&arena, io, client, max_retries);
     return self;
 }
 
@@ -546,9 +547,11 @@ fn getRepos(
 fn getLinesChanged(
     self: *Statistics,
     arena: *std.heap.ArenaAllocator,
+    io: std.Io,
     client: *HttpClient,
     max_retries: ?usize,
 ) !void {
+    const allocator = arena.allocator();
     const T = struct {
         repo: *Repository,
         delay: i64,
@@ -559,30 +562,30 @@ fn getLinesChanged(
         pub fn compareFn(_: void, lhs: T, rhs: T) std.math.Order {
             return std.math.order(lhs.timestamp, rhs.timestamp);
         }
-    }.compareFn) = .init(arena.allocator(), {});
-    defer q.deinit();
+    }.compareFn) = .empty;
+    defer q.deinit(allocator);
     for (self.repositories) |*repo| {
         if (repo.lines_changed > 0) {
             continue;
         }
-        try q.add(.{
+        try q.push(allocator, .{
             .repo = repo,
             .delay = 0,
-            .timestamp = std.time.timestamp(),
+            .timestamp = std.Io.Clock.real.now(io).toSeconds(),
             .retries = 0,
         });
     }
-    while (q.count() > 0) {
-        var item = q.remove();
-        const now = std.time.timestamp();
+    while (q.pop()) |_item| {
+        var item = _item;
+        const now = std.Io.Clock.real.now(io).toSeconds();
         if (item.timestamp > now) {
-            const delay: u64 = @intCast(item.timestamp - now);
+            const delay = item.timestamp - now;
             std.log.debug("Sleeping for {d}s. Waiting for {d} repo{s}.", .{
                 delay,
                 q.count() + 1,
                 if (q.count() + 1 != 0) "s" else "",
             });
-            std.Thread.sleep(delay * std.time.ns_per_s);
+            try io.sleep(.fromSeconds(delay), .real);
         }
         switch (try item.repo.getLinesChanged(arena, client, self.user)) {
             .ok => {},
@@ -590,14 +593,16 @@ fn getLinesChanged(
             // locally to compute lines changed
             // https://docs.github.com/en/rest/using-the-rest-api/troubleshooting-the-rest-api?apiVersion=2026-03-10#rate-limit-errors
             .accepted, .forbidden, .too_many_requests => {
-                item.timestamp = std.time.timestamp() + item.delay;
+                item.timestamp =
+                    std.Io.Clock.real.now(io).toSeconds() + item.delay;
                 // Note: this actually works way better with a very short delay,
                 // hence no exponential backoff
-                item.delay = std.crypto.random.intRangeAtMost(i64, 0, 4);
+                const random: std.Random.IoSource = .{ .io = io };
+                item.delay = random.interface().intRangeAtMost(i64, 0, 4);
                 item.retries += 1;
                 if (max_retries) |max| {
                     if (item.retries <= max) {
-                        try q.add(item);
+                        try q.push(allocator, item);
                     } else {
                         std.log.info(
                             "Cloning {s} to get lines changed...",
@@ -605,6 +610,7 @@ fn getLinesChanged(
                         );
                         item.repo.lines_changed = git.getLinesChanged(
                             arena.allocator(),
+                            io,
                             self.user,
                             client.token,
                             item.repo.name,
@@ -621,7 +627,7 @@ fn getLinesChanged(
                         });
                     }
                 } else {
-                    try q.add(item);
+                    try q.push(allocator, item);
                 }
             },
             else => |status| {

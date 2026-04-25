@@ -5,6 +5,7 @@
 const std = @import("std");
 
 allocator: std.mem.Allocator,
+io: std.Io,
 client: std.http.Client,
 bearer: []const u8,
 token: []const u8,
@@ -21,14 +22,15 @@ const Request = struct {
     extra_headers: []const std.http.Header = &.{},
 };
 
-pub fn init(allocator: std.mem.Allocator, token: []const u8) !Self {
+pub fn init(allocator: std.mem.Allocator, io: std.Io, token: []const u8) !Self {
     const bearer = try std.fmt.allocPrint(allocator, "Bearer {s}", .{token});
     errdefer allocator.free(bearer);
     const cloned_token = try allocator.dupe(u8, token);
     errdefer allocator.free(cloned_token);
     return .{
         .allocator = allocator,
-        .client = .{ .allocator = allocator },
+        .io = io,
+        .client = .{ .allocator = allocator, .io = io },
         .bearer = bearer,
         .token = cloned_token,
     };
@@ -49,7 +51,7 @@ pub fn fetch(self: *Self, request: Request, retries: isize) !Response {
         try std.Io.Writer.Allocating.initCapacity(self.allocator, 1024);
     var writer_initialized = true;
     errdefer if (writer_initialized) writer.deinit();
-    const status = (try (self.client.fetch(.{
+    const status = (self.client.fetch(.{
         .location = .{ .url = request.url },
         .response_writer = &writer.writer,
         .payload = request.body,
@@ -67,13 +69,13 @@ pub fn fetch(self: *Self, request: Request, retries: isize) !Response {
                 .{},
             );
             self.client.deinit();
-            self.client = .{ .allocator = self.allocator };
+            self.client = .{ .allocator = self.allocator, .io = self.io };
             writer.deinit();
             writer_initialized = false;
             return self.fetch(request, retries - 1);
         },
-        else => err,
-    })).status;
+        else => return err,
+    }).status;
     return .{
         .body = try writer.toOwnedSlice(),
         .status = status,

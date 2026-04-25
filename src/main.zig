@@ -56,8 +56,8 @@ const Args = struct {
 
     const Self = @This();
 
-    pub fn init(allocator: std.mem.Allocator) !Self {
-        return try argparse.parse(allocator, Self, struct {
+    pub fn init(main_init: std.process.Init) !Self {
+        return try argparse.parse(main_init, Self, struct {
             fn errorCheck(a: Self, stderr: *std.Io.Writer) !bool {
                 if ((a.access_token == null or a.access_token.?.len == 0) and
                     a.json_input_file == null and !a.version)
@@ -165,12 +165,11 @@ fn languages(
     );
 }
 
-pub fn main() !void {
-    var gpa: std.heap.GeneralPurposeAllocator(.{}) = .init;
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
+    const io = init.io;
 
-    const args = try Args.init(allocator);
+    const args = try Args.init(init);
     defer args.deinit(allocator);
     if (args.silent) {
         log_level = .err;
@@ -181,8 +180,8 @@ pub fn main() !void {
     }
 
     if (args.version) {
-        const stdout = std.fs.File.stdout();
-        var writer = stdout.writer(&.{});
+        const stdout = std.Io.File.stdout();
+        var writer = stdout.writer(io, &.{});
         try writer.interface.print(
             \\GitHub Stats version {s}
             \\https://github.com/jstrieb/github-stats
@@ -193,12 +192,12 @@ pub fn main() !void {
     }
 
     if (args.dump_overview_template) |path| {
-        try writeFile(path, embedded_overview_template);
+        try writeFile(io, path, embedded_overview_template);
         return;
     }
 
     if (args.dump_languages_template) |path| {
-        try writeFile(path, embedded_languages_template);
+        try writeFile(io, path, embedded_languages_template);
         return;
     }
 
@@ -216,16 +215,17 @@ pub fn main() !void {
     defer if (exclude_langs) |exclude| allocator.free(exclude);
 
     var stats: Statistics = if (args.json_input_file) |path| stats: {
-        const data = try readFile(allocator, path);
+        const data = try readFile(allocator, io, path);
         defer allocator.free(data);
         break :stats try Statistics.initFromJson(allocator, data);
     } else if (args.access_token) |access_token| stats: {
         std.log.info("Collecting statistics from GitHub API", .{});
-        var client: HttpClient = try .init(allocator, access_token);
+        var client: HttpClient = try .init(allocator, io, access_token);
         defer client.deinit();
         break :stats try Statistics.init(
             &client,
             allocator,
+            io,
             args.max_retries,
         );
     } else unreachable;
@@ -235,6 +235,7 @@ pub fn main() !void {
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
         try writeFile(
+            io,
             path,
             try std.json.Stringify.valueAlloc(
                 arena.allocator(),
@@ -245,8 +246,8 @@ pub fn main() !void {
     }
 
     var aggregate_stats: struct {
-        languages: std.StringArrayHashMap(u64),
-        language_colors: std.StringArrayHashMap([]const u8),
+        languages: std.array_hash_map.String(u64),
+        language_colors: std.array_hash_map.String([]const u8),
         contributions: usize,
         name: []const u8,
         languages_total: usize = 0,
@@ -261,12 +262,12 @@ pub fn main() !void {
             stats.commit_contributions +
             stats.pr_contributions +
             stats.review_contributions,
-        .languages = .init(allocator),
-        .language_colors = .init(allocator),
+        .languages = try .init(allocator, &.{}, &.{}),
+        .language_colors = try .init(allocator, &.{}, &.{}),
         .name = stats.name,
     };
-    defer aggregate_stats.languages.deinit();
-    defer aggregate_stats.language_colors.deinit();
+    defer aggregate_stats.languages.deinit(allocator);
+    defer aggregate_stats.language_colors.deinit(allocator);
     for (stats.repositories) |repository| {
         if (glob.matchAny(exclude_repos orelse &.{}, repository.name) or
             (args.exclude_private and repository.private))
@@ -283,11 +284,15 @@ pub fn main() !void {
                 continue;
             }
             if (language.color) |color| {
-                try aggregate_stats.language_colors.put(language.name, color);
+                try aggregate_stats.language_colors.put(
+                    allocator,
+                    language.name,
+                    color,
+                );
             }
             var total = aggregate_stats.languages.get(language.name) orelse 0;
             total += language.size;
-            try aggregate_stats.languages.put(language.name, total);
+            try aggregate_stats.languages.put(allocator, language.name, total);
             aggregate_stats.languages_total += language.size;
         };
     }
@@ -304,24 +309,26 @@ pub fn main() !void {
         defer arena.deinit();
 
         try writeFile(
+            io,
             args.overview_output_file orelse "overview.svg",
             try overview(
                 &arena,
                 aggregate_stats,
                 if (args.overview_template) |template|
-                    try readFile(arena.allocator(), template)
+                    try readFile(arena.allocator(), io, template)
                 else
                     embedded_overview_template,
             ),
         );
 
         try writeFile(
+            io,
             args.languages_output_file orelse "languages.svg",
             try languages(
                 &arena,
                 aggregate_stats,
                 if (args.languages_template) |template|
-                    try readFile(arena.allocator(), template)
+                    try readFile(arena.allocator(), io, template)
                 else
                     embedded_languages_template,
             ),
@@ -333,32 +340,37 @@ test {
     std.testing.refAllDecls(@This());
 }
 
-fn readFile(allocator: std.mem.Allocator, path: []const u8) ![]const u8 {
+fn readFile(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    path: []const u8,
+) ![]const u8 {
     std.log.info("Reading data from '{s}'", .{path});
     const in =
         if (std.mem.eql(u8, path, "-"))
-            std.fs.File.stdin()
+            std.Io.File.stdin()
         else
-            try std.fs.cwd().openFile(path, .{});
-    defer if (!std.mem.eql(u8, path, "-")) in.close();
+            try std.Io.Dir.cwd().openFile(io, path, .{});
+    defer if (!std.mem.eql(u8, path, "-")) in.close(io);
     var read_buffer: [64 * 1024]u8 = undefined;
-    var reader = in.reader(&read_buffer);
+    var reader = in.reader(io, &read_buffer);
     return try (&reader.interface).allocRemaining(allocator, .unlimited);
 }
 
 fn writeFile(
+    io: std.Io,
     path: []const u8,
     data: []const u8,
 ) !void {
     std.log.info("Writing data to '{s}'", .{path});
     const out =
         if (std.mem.eql(u8, path, "-"))
-            std.fs.File.stdout()
+            std.Io.File.stdout()
         else
-            try std.fs.cwd().createFile(path, .{});
-    defer if (!std.mem.eql(u8, path, "-")) out.close();
+            try std.Io.Dir.cwd().createFile(io, path, .{});
+    defer if (!std.mem.eql(u8, path, "-")) out.close(io);
     var write_buffer: [64 * 1024]u8 = undefined;
-    var writer = out.writer(&write_buffer);
+    var writer = out.writer(io, &write_buffer);
     try writer.interface.writeAll(data);
     try writer.interface.flush();
 }

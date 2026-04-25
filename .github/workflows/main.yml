@@ -23,7 +23,7 @@ jobs:
 
     - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29  # v2 tag
       with:
-        version: 0.15.2
+        version: 0.16.0
 
     - name: Build
       run: |

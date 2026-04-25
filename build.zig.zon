@@ -2,7 +2,7 @@
     .name = .github_stats,
     .version = "2.0.0",
     .fingerprint = 0x80bb05a632422e37, // Changing this has security and trust implications.
-    .minimum_zig_version = "0.15.2",
+    .minimum_zig_version = "0.16.0",
     .dependencies = .{},
     .paths = .{
         "build.zig",
