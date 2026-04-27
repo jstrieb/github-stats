@@ -56,7 +56,8 @@ const Repository = struct {
         );
         defer client.allocator.free(response.body);
         if (response.status == .ok) {
-            const authors = (try std.json.parseFromSliceLeaky(
+            self.lines_changed = 0;
+            const authors = std.json.parseFromSliceLeaky(
                 []struct {
                     author: struct { login: []const u8 },
                     weeks: []struct {
@@ -67,8 +68,16 @@ const Repository = struct {
                 arena.allocator(),
                 response.body,
                 .{ .ignore_unknown_fields = true },
-            ));
-            self.lines_changed = 0;
+            ) catch {
+                // TODO: Replace with proper exception propagation when GitHub
+                // gets their shit together and stops breaking this endpoint
+                std.log.info(
+                    "Skipping lines changed by {s} in {s} due to invalid " ++
+                        "response from GitHub.",
+                    .{ user, self.name },
+                );
+                return response.status;
+            };
             for (authors) |o| {
                 if (!std.mem.eql(u8, o.author.login, user)) {
                     continue;
