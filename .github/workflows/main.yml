@@ -27,7 +27,7 @@ jobs:
 
     - name: Build
       run: |
-        zig build --release
+        zig build
 
     - name: Checkout history branch
       run: |
@@ -45,7 +45,7 @@ jobs:
         EXCLUDE_REPOS: ${{ secrets.EXCLUDE_REPOS }}
         EXCLUDE_LANGS: ${{ secrets.EXCLUDE_LANGS }}
         EXCLUDE_PRIVATE: "false"
-        DEBUG: "false"
+        SILENT: "true"
         # TODO: Remove this when they get their API working again
         # https://github.com/orgs/community/discussions/192970
         MAX_RETRIES: 5
