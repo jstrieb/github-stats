@@ -45,6 +45,7 @@ const Args = struct {
     exclude_repos: ?[]const u8 = null,
     exclude_langs: ?[]const u8 = null,
     exclude_private: bool = false,
+    exclude_inherited: bool = false,
     overview_output_file: ?[]const u8 = null,
     languages_output_file: ?[]const u8 = null,
     overview_template: ?[]const u8 = null,
@@ -274,6 +275,9 @@ pub fn main(init: std.process.Init) !void {
         {
             continue;
         }
+        const is_owned = !repository.fork and
+            std.mem.eql(u8, repository.owner_login, stats.user);
+        if (args.exclude_inherited and !is_owned) continue;
         aggregate_stats.stars += repository.stars;
         aggregate_stats.forks += repository.forks;
         aggregate_stats.lines_changed += repository.lines_changed;
