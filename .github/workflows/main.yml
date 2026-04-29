@@ -45,7 +45,7 @@ jobs:
         EXCLUDE_REPOS: ${{ secrets.EXCLUDE_REPOS }}
         EXCLUDE_LANGS: ${{ secrets.EXCLUDE_LANGS }}
         EXCLUDE_PRIVATE: "false"
-        EXCLUDE_INHERITED: "true"
+        EXCLUDE_INHERITED: "false"
         SILENT: "true"
         # TODO: Remove this when they get their API working again
         # https://github.com/orgs/community/discussions/192970
