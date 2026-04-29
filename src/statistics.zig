@@ -22,9 +22,12 @@ const Repository = struct {
     lines_changed: u32,
     views: u32,
     private: bool,
+    fork: bool,
+    owner_login: []const u8,
 
     pub fn deinit(self: @This(), allocator: std.mem.Allocator) void {
         allocator.free(self.name);
+        allocator.free(self.owner_login);
         if (self.languages) |languages| {
             for (languages) |language| {
                 language.deinit(allocator);
@@ -264,6 +267,8 @@ fn getReposByYear(
         \\          stargazerCount
         \\          forkCount
         \\          isPrivate
+        \\          isFork
+        \\          owner { login }
         \\          languages(
         \\              first: 100,
         \\              orderBy: { direction: DESC, field: SIZE }
@@ -320,6 +325,8 @@ fn getReposByYear(
                         stargazerCount: u32,
                         forkCount: u32,
                         isPrivate: bool,
+                        isFork: bool,
+                        owner: struct { login: []const u8 },
                         languages: ?struct {
                             edges: ?[]struct {
                                 size: u32,
@@ -388,9 +395,11 @@ fn getReposByYear(
         }
         var repository = Repository{
             .name = try context.allocator.dupe(u8, raw_repo.nameWithOwner),
+            .owner_login = try context.allocator.dupe(u8, raw_repo.owner.login),
             .stars = raw_repo.stargazerCount,
             .forks = raw_repo.forkCount,
             .private = raw_repo.isPrivate,
+            .fork = raw_repo.isFork,
             .languages = null,
             .views = 0,
             .lines_changed = 0,
