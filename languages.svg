@@ -134,7 +134,7 @@ div.ellipsis {
 <span class="progress">
 <span style="
   background-color: #3572A5; 
-  width: 33.182%;
+  width: 33.181%;
 " class="progress-item"></span><span style="
   background-color: #555555; 
   width: 15.929%;
@@ -143,7 +143,7 @@ div.ellipsis {
   width: 9.323%;
 " class="progress-item"></span><span style="
   background-color: #ec915c; 
-  width: 9.023%;
+  width: 9.026%;
 " class="progress-item"></span><span style="
   background-color: #ff3e00; 
   width: 6.779%;
@@ -167,7 +167,7 @@ div.ellipsis {
   width: 1.877%;
 " class="progress-item"></span><span style="
   background-color: #663399; 
-  width: 1.691%;
+  width: 1.690%;
 " class="progress-item"></span><span style="
   background-color: #427819; 
   width: 1.310%;
@@ -275,7 +275,7 @@ div.ellipsis {
       d="M8 4a4 4 0 100 8 4 4 0 000-8z"
   ></path></svg>
   <span class="lang">Zig</span>
-  <span class="percent">9.02%</span>
+  <span class="percent">9.03%</span>
 </li>
 <li style="animation-delay: 750ms;">
   <svg 
