@@ -134,7 +134,7 @@ div.ellipsis {
 <span class="progress">
 <span style="
   background-color: #3572A5; 
-  width: 32.628%;
+  width: 32.627%;
 " class="progress-item"></span><span style="
   background-color: #555555; 
   width: 15.663%;
@@ -152,10 +152,10 @@ div.ellipsis {
   width: 6.344%;
 " class="progress-item"></span><span style="
   background-color: #dc566d; 
-  width: 6.016%;
+  width: 6.015%;
 " class="progress-item"></span><span style="
   background-color: #3D6117; 
-  width: 2.253%;
+  width: 2.254%;
 " class="progress-item"></span><span style="
   background-color: #00ADD8; 
   width: 2.172%;
