@@ -1,5 +1,6 @@
 const std = @import("std");
 const git = @import("git.zig");
+const glob = @import("glob.zig");
 const HttpClient = @import("http_client.zig");
 
 repositories: []Repository,
@@ -117,11 +118,13 @@ pub fn init(
     allocator: std.mem.Allocator,
     io: std.Io,
     max_retries: ?usize,
+    exclude_repos: []const []const u8,
 ) !Statistics {
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
 
-    var self: Statistics = try getRepos(allocator, &arena, client);
+    var self: Statistics =
+        try getRepos(allocator, &arena, client, exclude_repos);
     errdefer self.deinit(allocator);
     try self.getLinesChanged(&arena, io, client, max_retries);
     return self;
@@ -240,6 +243,7 @@ fn getReposByYear(
         result: *Statistics,
         seen: *std.StringHashMap(bool),
         repositories: *std.ArrayList(Repository),
+        exclude_repos: []const []const u8,
     },
     year: usize,
     start_month: usize,
@@ -386,6 +390,15 @@ fn getReposByYear(
             );
             continue;
         }
+        // Skip excluded repos before making any per-repo API requests
+        if (glob.matchAny(context.exclude_repos, raw_repo.nameWithOwner)) {
+            std.log.debug(
+                "Skipping {s} (excluded)",
+                .{raw_repo.nameWithOwner},
+            );
+            try context.seen.put(raw_repo.nameWithOwner, true);
+            continue;
+        }
         var repository = Repository{
             .name = try context.allocator.dupe(u8, raw_repo.nameWithOwner),
             .stars = raw_repo.stargazerCount,
@@ -475,6 +488,7 @@ fn getRepos(
     allocator: std.mem.Allocator,
     arena: *std.heap.ArenaAllocator,
     client: *HttpClient,
+    exclude_repos: []const []const u8,
 ) !Statistics {
     var result: Statistics = .{
         .user = undefined,
@@ -530,6 +544,7 @@ fn getRepos(
             .result = &result,
             .seen = &seen,
             .repositories = &repositories,
+            .exclude_repos = exclude_repos,
         }, year, 0, 12);
     }
 
