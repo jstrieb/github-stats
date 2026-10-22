@@ -74,6 +74,29 @@ pub fn fetch(self: *Self, request: Request, retries: isize) !Response {
             writer_initialized = false;
             return self.fetch(request, retries - 1);
         },
+        // Transient network failures (e.g., flaky DNS on CI runners) should
+        // not abort the whole run. Back off and retry with a fresh client.
+        error.NameServerFailure,
+        error.Timeout,
+        error.ConnectionRefused,
+        error.ConnectionResetByPeer,
+        error.HostUnreachable,
+        error.NetworkUnreachable,
+        error.NetworkDown,
+        => {
+            writer.deinit();
+            writer_initialized = false;
+            if (retries <= 0) return err;
+            const delay: i64 = @intCast(2 * (9 - @min(retries, 8)));
+            std.log.debug(
+                "Network error {s}. Retrying in {d}s.",
+                .{ @errorName(err), delay },
+            );
+            try self.io.sleep(.fromSeconds(delay), .real);
+            self.client.deinit();
+            self.client = .{ .allocator = self.allocator, .io = self.io };
+            return self.fetch(request, retries - 1);
+        },
         else => return err,
     }).status;
     return .{
