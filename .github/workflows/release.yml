@@ -6,6 +6,9 @@ on:
       - '*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 defaults:
   run:
     shell: bash -euxo pipefail {0}
@@ -16,7 +19,7 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
-    - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29  # v2 tag
+    - uses: mlugg/setup-zig@v2
       with:
         version: 0.16.0
         # I only want to disable the build cache, but don't see a good way to do
@@ -29,7 +32,7 @@ jobs:
 
     - name: Upload Release Artifacts
       env:
-        GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         TAG: ${{ github.ref_name }}
       run: |
         (
