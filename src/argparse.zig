@@ -24,6 +24,7 @@ pub fn parse(
     const args = try init.minimal.args.toSlice(a);
 
     const fields = @typeInfo(T).@"struct".fields;
+    @setEvalBranchQuota(fields.len * 100);
     var seen = [_]bool{false} ** fields.len;
     var result: T = undefined;
     errdefer {

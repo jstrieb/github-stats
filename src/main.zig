@@ -37,6 +37,7 @@ const embedded_languages_template = @embedFile("templates/languages.svg");
 
 const Args = struct {
     access_token: ?[]const u8 = null,
+    org_access_tokens: ?[]const u8 = null,
     json_input_file: ?[]const u8 = null,
     json_output_file: ?[]const u8 = null,
     silent: bool = false,
@@ -322,6 +323,32 @@ pub fn main(init: std.process.Init) !void {
         std.log.info("Collecting statistics from GitHub API", .{});
         var client: HttpClient = try .init(allocator, io, access_token);
         defer client.deinit();
+
+        const org_tokens =
+            if (args.org_access_tokens) |tokens|
+                try splitList(allocator, tokens, " ,\t\r\n")
+            else
+                try allocator.alloc([]const u8, 0);
+        defer allocator.free(org_tokens);
+        const org_clients = try allocator.alloc(HttpClient, org_tokens.len);
+        defer allocator.free(org_clients);
+        const org_client_pointers =
+            try allocator.alloc(*HttpClient, org_tokens.len);
+        defer allocator.free(org_client_pointers);
+        var org_clients_initialized: usize = 0;
+        defer for (org_clients[0..org_clients_initialized]) |*c| c.deinit();
+        for (org_tokens, org_clients, org_client_pointers) |token, *c, *p| {
+            c.* = try .init(allocator, io, token);
+            org_clients_initialized += 1;
+            p.* = c;
+        }
+        if (org_tokens.len > 0) {
+            std.log.info(
+                "Using {d} organization installation token{s}",
+                .{ org_tokens.len, if (org_tokens.len != 1) "s" else "" },
+            );
+        }
+
         break :stats Statistics.init(
             &client,
             allocator,
@@ -334,6 +361,7 @@ pub fn main(init: std.process.Init) !void {
                     args.github_stats_max_runtime_seconds,
                 .exclude_repos = exclude_repos orelse &.{},
                 .exclude_forked_repos = args.exclude_forked_repos,
+                .org_clients = org_client_pointers,
             },
         ) catch |err| switch (err) {
             error.TimeBudgetExceeded => {

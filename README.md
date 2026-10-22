@@ -188,6 +188,24 @@ and retrieve the images.
    ```
 1. Star this repo if you like it!
 
+### Organization Repositories with a GitHub App
+
+A fine-grained `ACCESS_TOKEN` can only see one resource owner. To include
+repositories from organizations without a classic token, use a read-only GitHub
+App. The workflow mints a short-lived installation token for each organization
+and passes them to the CLI as `ORG_ACCESS_TOKENS` (comma-separated).
+
+1. [Create the App](https://github.com/settings/apps/new?name=github-stats&url=https://github.com/jstrieb/github-stats&public=true&webhook_active=false&contents=read&metadata=read&administration=read)
+   with Contents, Metadata, and Administration (for view counts) set to
+   read-only and the webhook disabled. It must be public ("Any account") to be
+   installed on organizations.
+1. Generate a private key, then install the App on each organization with
+   access to all repositories.
+1. Add the repository variable `STATS_APP_CLIENT_ID`, the secret
+   `STATS_APP_PRIVATE_KEY` (the PEM file), and `STATS_APP_ORGS` as a secret or
+   variable listing the organizations to collect. Since the App is public,
+   installations on organizations not in `STATS_APP_ORGS` are ignored.
+
 
 ## Analyzing the Data
 

@@ -30,6 +30,9 @@ const Repository = struct {
     views: u32,
     private: bool,
     owned: bool = true,
+    // Index of the client that discovered this repository: 0 is the user
+    // token, and the rest are organization installation tokens
+    client_index: usize = 0,
 
     pub fn deinit(self: @This(), allocator: std.mem.Allocator) void {
         allocator.free(self.cache_key);
@@ -142,6 +145,9 @@ pub const InitOptions = struct {
     max_runtime_seconds: ?u64 = null,
     exclude_repos: []const []const u8 = &.{},
     exclude_forked_repos: bool = false,
+    // Clients using GitHub App installation tokens for organizations the user
+    // token cannot see
+    org_clients: []const *HttpClient = &.{},
 };
 
 const TimeBudget = struct {
@@ -218,6 +224,7 @@ const RepoContext = struct {
     arena: *std.heap.ArenaAllocator,
     io: std.Io,
     client: *HttpClient,
+    client_index: usize = 0,
     cache: *Cache,
     budget: TimeBudget,
     user: []const u8,
@@ -240,6 +247,10 @@ pub fn init(
     var cache = try Cache.init(allocator, io, options.cache_file);
     defer cache.deinit();
     const budget = TimeBudget.init(io, options.max_runtime_seconds);
+    const clients = try allocator.alloc(*HttpClient, options.org_clients.len + 1);
+    defer allocator.free(clients);
+    clients[0] = client;
+    @memcpy(clients[1..], options.org_clients);
 
     var self: Statistics = try getRepos(
         allocator,
@@ -254,7 +265,7 @@ pub fn init(
         allocator,
         &arena,
         io,
-        client,
+        clients,
         &cache,
         budget,
         options.max_retries,
@@ -267,7 +278,7 @@ pub fn init(
     self.getContributionLanguages(
         allocator,
         io,
-        client,
+        clients,
         &cache,
         budget,
     ) catch |err| {
@@ -668,6 +679,7 @@ fn appendRepository(context: RepoContext, raw_repo: RawRepository) !void {
         .forks = raw_repo.forkCount,
         .private = raw_repo.isPrivate,
         .owned = owned,
+        .client_index = context.client_index,
         .languages = null,
         .contribution_languages = null,
         .views = 0,
@@ -887,6 +899,105 @@ fn getAllRepos(context: RepoContext) !void {
     }
 }
 
+/// List every repository visible to a GitHub App installation token. The
+/// installation's bot is the GraphQL viewer, so repositories are listed through
+/// REST and then looked up by node ID.
+fn getInstallationRepos(context: RepoContext) !void {
+    const per_page = 100;
+    var page: usize = 1;
+    while (true) {
+        try context.budget.check();
+        std.log.info("Getting installation repository page {d}...", .{page});
+        const response = try context.client.rest(try std.fmt.allocPrint(
+            context.arena.allocator(),
+            "https://api.github.com/installation/repositories?per_page={d}&page={d}",
+            .{ per_page, page },
+        ));
+        defer context.client.allocator.free(response.body);
+        if (response.status != .ok) {
+            std.log.err(
+                "Failed to get installation repository page {d} ({?s})",
+                .{ page, response.status.phrase() },
+            );
+            return error.RequestFailed;
+        }
+
+        const page_data = try std.json.parseFromSliceLeaky(
+            struct { repositories: []struct { node_id: []const u8 } },
+            context.arena.allocator(),
+            response.body,
+            .{ .ignore_unknown_fields = true, .allocate = .alloc_always },
+        );
+        const ids = try context.arena.allocator().alloc(
+            []const u8,
+            page_data.repositories.len,
+        );
+        for (ids, page_data.repositories) |*id, repository| {
+            id.* = repository.node_id;
+        }
+        if (ids.len > 0) try getReposByIds(context, ids);
+
+        if (page_data.repositories.len < per_page) break;
+        page += 1;
+    }
+}
+
+fn getReposByIds(context: RepoContext, ids: []const []const u8) !void {
+    try context.budget.check();
+    const response = try context.client.graphql(
+        \\query ($ids: [ID!]!) {
+        \\  nodes(ids: $ids) {
+        \\    ... on Repository {
+        \\      id
+        \\      nameWithOwner
+        \\      pushedAt
+        \\      owner {
+        \\        login
+        \\      }
+        \\      stargazerCount
+        \\      forkCount
+        \\      isPrivate
+        \\      isFork
+        \\      languages(
+        \\          first: 100,
+        \\          orderBy: { direction: DESC, field: SIZE }
+        \\      ) {
+        \\        edges {
+        \\          size
+        \\          node {
+        \\            name
+        \\            color
+        \\          }
+        \\        }
+        \\      }
+        \\    }
+        \\  }
+        \\}
+    ,
+        .{ .ids = ids },
+    );
+    defer context.client.allocator.free(response.body);
+    if (response.status != .ok) {
+        std.log.err(
+            "Failed to get installation repositories ({?s})",
+            .{response.status.phrase()},
+        );
+        return error.RequestFailed;
+    }
+
+    const nodes = (try std.json.parseFromSliceLeaky(
+        struct { data: struct { nodes: []?RawRepository } },
+        context.arena.allocator(),
+        response.body,
+        .{ .ignore_unknown_fields = true, .allocate = .alloc_always },
+    )).data.nodes;
+    for (nodes) |maybe_raw_repo| {
+        if (maybe_raw_repo) |raw_repo| {
+            try appendRepository(context, raw_repo);
+        }
+    }
+}
+
 fn getRepos(
     allocator: std.mem.Allocator,
     arena: *std.heap.ArenaAllocator,
@@ -959,6 +1070,12 @@ fn getRepos(
     for (info.years) |year| {
         try getReposByYear(context, year, 0, 12);
     }
+    for (options.org_clients, 1..) |org_client, i| {
+        var org_context = context;
+        org_context.client = org_client;
+        org_context.client_index = i;
+        try getInstallationRepos(org_context);
+    }
 
     result.repositories = try repositories.toOwnedSlice(allocator);
     errdefer {
@@ -984,7 +1101,7 @@ fn getLinesChanged(
     repository_allocator: std.mem.Allocator,
     arena: *std.heap.ArenaAllocator,
     io: std.Io,
-    client: *HttpClient,
+    clients: []const *HttpClient,
     cache: *Cache,
     budget: TimeBudget,
     max_retries: ?usize,
@@ -1027,6 +1144,7 @@ fn getLinesChanged(
             try io.sleep(.fromSeconds(delay), .real);
             try budget.check();
         }
+        const client = clients[item.repo.client_index];
         const status = try item.repo.getLinesChanged(arena, client, self.user);
         if (linesChangedComplete(status)) {
             item.repo.lines_changed_complete = true;
@@ -1120,7 +1238,7 @@ fn getContributionLanguages(
     self: *Statistics,
     allocator: std.mem.Allocator,
     io: std.Io,
-    client: *HttpClient,
+    clients: []const *HttpClient,
     cache: *Cache,
     budget: TimeBudget,
 ) !void {
@@ -1164,7 +1282,7 @@ fn getContributionLanguages(
             allocator,
             io,
             self.user,
-            client.token,
+            clients[repo.client_index].token,
             repo.name,
             self.emails,
         ) catch |e| switch (e) {

@@ -83,10 +83,12 @@ pub fn getContributionStats(
     const allocator = arena.allocator();
 
     const repo_path = try std.mem.replaceOwned(u8, allocator, repo, "/", "_");
+    // GitHub ignores the username for token auth, but App installation tokens
+    // are documented with x-access-token, and it works for user tokens too
     const repo_url = try std.fmt.allocPrint(
         allocator,
-        "https://{s}:{s}@github.com/{s}.git",
-        .{ login, token, repo },
+        "https://x-access-token:{s}@github.com/{s}.git",
+        .{ token, repo },
     );
     const clone = try std.process.run(allocator, io, .{
         .argv = &.{
